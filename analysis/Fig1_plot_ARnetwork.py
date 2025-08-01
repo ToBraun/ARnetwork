@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 
 # specific packages
 import networkx as nx
+from networkx.readwrite import gexf
 import cartopy.crs as ccrs
 
 # my packages
@@ -46,11 +47,9 @@ Figure 1: plot the AR networks.
 
 # %% LOAD DATA
 
-Gplot_pikart = nx.load_gexf(INPUT_PATH + "arnet_pikart_centroid.gexf")
-Gplot_target = nx.load_gexf(INPUT_PATH + "arnet_target_centroid.gexf")
-Gplot_cons = nx.load_gexf(INPUT_PATH + "arnet_consensus_centroid.gexf")
-
-
+Gplot_pikart = gexf.read_gexf(INPUT_PATH + "arnet_pikart_centroid.gexf")
+Gplot_target = gexf.read_gexf(INPUT_PATH + "arnet_target_centroid.gexf")
+Gplot_cons = gexf.read_gexf(INPUT_PATH + "arnet_consensus_centroid.gexf")
 
 
 # %% PANEL A -  PIKART
@@ -83,8 +82,9 @@ plt.savefig(OUTPUT_PATH + "Fig1b.png", dpi=300, bbox_inches='tight')
 
 
 ### PLOT
-nplot.plot_network(Gplot_cons, widths='weights', colours='weights', layout='default', ndec=ndec, log=False,
+nplot.plot_network(Gplot_cons, widths='weights', colours='weights', layout='dark', ndec=ndec, log=False,
                   arrowsize=0, linewidth=3, curvature=0.4, fontsize=14, ncolors=20, discard=180,
                   alpha=.5, show_nodes=True, proj = ccrs.EqualEarth(), show_axes=False)
-plt.savefig(OUTPUT_PATH + "Fig1c.png", dpi=300, bbox_inches='tight')
+plt.savefig("/Users/tbraun/Desktop/" + "ARnetwork.png", dpi=500, bbox_inches='tight')
+#plt.savefig(OUTPUT_PATH + "Fig1c.png", dpi=300, bbox_inches='tight')
 
