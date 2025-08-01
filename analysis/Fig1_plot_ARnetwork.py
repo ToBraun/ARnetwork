@@ -85,6 +85,6 @@ plt.savefig(OUTPUT_PATH + "Fig1b.png", dpi=300, bbox_inches='tight')
 nplot.plot_network(Gplot_cons, widths='weights', colours='weights', layout='dark', ndec=ndec, log=False,
                   arrowsize=0, linewidth=3, curvature=0.4, fontsize=14, ncolors=20, discard=180,
                   alpha=.5, show_nodes=True, proj = ccrs.EqualEarth(), show_axes=False)
-plt.savefig("/Users/tbraun/Desktop/" + "ARnetwork.png", dpi=500, bbox_inches='tight')
+plt.savefig("/Users/tbraun/Desktop/" + "ARnetwork.png", dpi=500, bbox_inches='tight', transparent=True)
 #plt.savefig(OUTPUT_PATH + "Fig1c.png", dpi=300, bbox_inches='tight')
 
