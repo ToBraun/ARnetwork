@@ -1,12 +1,13 @@
-# ARnetwork
+![The global atmospheric river network](ARTN.png)
+
+# ARnetwork.py
 
 Codebase for constructing, analysing, and visualising **Atmospheric River Transport Networks (ARTNs)** &mdash; directed, weighted complex networks built from global catalogues of atmospheric river (AR) trajectories.
 
-![The global atmospheric river network](ARTN.png)
 
 ## About
 
-Atmospheric rivers transport vast amounts of water vapour and are responsible for a substantial share of global precipitation and wind extremes. The global AR network recasts individual AR trajectories as edges on a discretised global hexagonal grid (H3), so we can study the planetary-scale pattern of AR transport with the tools of complex network science: centralities, shortest paths, communities, random walks and secondary node/edge attributes that carry additional information on AR transport, e.g., about integrated water vapour transport (IVT). ARs have to be localized by a suitable 2D locator, e.g., the AR centroid. The ARTN is a directed, weighted graph.
+Atmospheric rivers (ARs) transport vast amounts of water vapour and are responsible for a substantial share of global precipitation and wind extremes. The global AR network ingests individual AR trajectories and creates edges based on their recurrent transport patterns. ARs are localized by a suitable 2D locator, e.g., the AR centroid. The resulting Atmospheric River Transport Network (ARTN) is a directed, weighted graph. This enables us study the planetary-scale pattern of AR transport with the tools of complex network science: centralities, shortest paths, communities, random walks and secondary node/edge attributes that carry additional information on AR transport (e.g., integrated water vapour transport). 
 
 This repository contains the analysis code accompanying the paper:
 
@@ -14,7 +15,7 @@ This repository contains the analysis code accompanying the paper:
 > *Atmospheric river trajectories organise along a global transport network.*
 > Preprint (2026). https://doi.org/10.21203/rs.3.rs-7482510/v2
 
-The networks are built from two independent global AR catalogues &mdash; [**PIKART**](https://ar.pik-potsdam.de)  and **tARget v4** &mdash; both derived from ERA5 reanalysis. Most results in the paper are reported as the consensus of the two catalogues.
+The networks are built from two independent global AR catalogues &mdash; [**PIKART**](https://ar.pik-potsdam.de)  and **tARget-4** &mdash; both derived from ERA5 reanalysis. Most results in the paper are reported as the consensus of the two catalogues.
 
 ## Repository structure
 
@@ -36,19 +37,25 @@ The core modules used across the analysis scripts are:
 
 ## Data
 
-The analysis draws on several publicly available datasets:
+The analysis draws on several publicly available datasets. The core datasets are the two AR catalogs:
 
 - **PIKART-1** AR catalogue, together with related Python and Bash code:
   [ar.pik-potsdam.de](https://ar.pik-potsdam.de)
 - **tARget v4** AR catalogue (Guan, 2024), provided by Bin Guan via the
   Global Atmospheric Rivers Dataverse:
   [dataverse.ucla.edu/dataverse/ar](https://dataverse.ucla.edu/dataverse/ar)
+
+These are derived from the following source data:
 - **ERA5** reanalysis (Hersbach et al., 2023), Copernicus Climate Data Store:
   [cds.climate.copernicus.eu](https://cds.climate.copernicus.eu/)
 - **MERRA-2** reanalysis, NASA Goddard Earth Sciences Data and Information
   Services Center (GES DISC):
   [disc.gsfc.nasa.gov](https://disc.gsfc.nasa.gov/)
-- **HydroSHEDS** digital elevation model, used for topographic plotting:
+
+Additionally, the following data has been used in the manuscript:
+- The **AR-CONNECT** dataset is available at the UC San Diego Library's Research Data Curation Program at \url{https://doi.org/10.6075/J0D21W00}.
+- The catalog derived from the **IPART algorithm** can be generated from the code stored in the Zenodo repository at \url{https://doi.org/10.5281/zenodo.3864592}. 
+- **HydroSHEDS** digital elevation model (only used for plotting topography):
   [hydrosheds.org](https://www.hydrosheds.org)
 - **Oceanic Niño Index (ONI) V2**, provided by NOAA:
   [psl.noaa.gov/data/timeseries/month/DS/ONI/](https://psl.noaa.gov/data/timeseries/month/DS/ONI/)
@@ -80,7 +87,7 @@ Core dependencies:
 - `geopandas` &mdash; vector spatial data
 - `tqdm`
 
-A minimal `conda` environment to get started (some smaller dependencies missing though):
+A minimal `conda` environment to get started with:
 
 ```bash
 conda create -n arnet python=3.9.20 numpy pandas scipy scikit-learn networkx \
@@ -120,7 +127,7 @@ G = artn.generate_network(
 )
 ```
 
-The full set of analyses reproducing the paper figures lives under `analysis/` and `ARnetlab/`.
+The full set of analyses reproducing the paper figures lives under `analysis/`.
 
 ## Citing
 
