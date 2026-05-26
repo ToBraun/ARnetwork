@@ -1,15 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
-#------------------ PATHS ---------------------------#
-
+#------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
+from pathlib import Path
+import os
+
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 
 # %% IMPORT MODULES
@@ -22,7 +27,7 @@ from matplotlib import pyplot as plt
 # specific packages
 import networkx as nx
 
-# my packages
+# local subroutines
 import ARnet_sub as artn
 
 
@@ -53,7 +58,7 @@ d_ars_target['time'] = pd.to_datetime(d_ars_target['time'])
 # %% PARAMETERS
 
 """
-Figure 1: generate networks for different AR catalogs.
+Figure 2: generate networks for different AR catalogs.
 """
 
 ## Network parameters
@@ -119,7 +124,7 @@ Gplot_cons = artn.consensus_network([Gplot_pikart, Gplot_target], thresh, eps)
 
 
 
-# %% SAVE OUTPUT
+# %% SAVE OUTPUT - these will be plotted in the respective plotting script
 
 nx.write_gexf(Gplot_pikart, OUTPUT_PATH + "arnet_pikart_centroid.gexf")
 nx.write_gexf(Gplot_target, OUTPUT_PATH + "arnet_target_centroid.gexf")

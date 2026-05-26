@@ -46,7 +46,6 @@ mpl.rcParams['font.size'] = 18
 
 loc = 'centroid'
 
-
 Gcons_rndm = nx.read_gml(INPUT_PATH + 'l_Gwalk_rndm_' + str(0) + '._cons_' + loc + '.gml')
 Gcons_rewired = nx.read_gml(INPUT_PATH + 'l_G_rewired_' + str(0) + '_cons_' + loc + '.gml')
 Gcons_genesis = nx.read_gml(INPUT_PATH + 'l_Gwalk_genesis_' + str(0) + '_cons_' + loc + '.gml')

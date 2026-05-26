@@ -1,15 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
 #------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/output/'
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 # %% IMPORT MODULES
 
@@ -28,7 +33,7 @@ from collections import defaultdict
 import xarray as xr
 from statsmodels.stats.multitest import multipletests
 
-# my packages
+# local subroutines
 import ARnet_sub as artn
 import NETanalysis_sub as ana
 import NETplots_sub as nplot
@@ -58,7 +63,7 @@ d_ars_target = pd.read_pickle(INPUT_PATH + 'target' + '_hex.pkl')
 
 
 # TOPOGRAPHY
-dem_ds = xr.open_dataset('/Users/tbraun/Desktop/projects/#A_PIKART_PIK/ARcatalog_shared/scripts/detection&tracking/input_files/hyd_glo_dem_0_75deg.nc')
+dem_ds = xr.open_dataset(INPUT_PATH + 'hyd_glo_dem_0_75deg.nc')
 dem = dem_ds['dem'].isel(time=0)
 
 # Parameters
@@ -87,7 +92,7 @@ for n in tqdm(range(Nrealiz)):
 # %% REAL CATALOG
 
 """
-Figure 3: AR hubs by means of node strength, divergence and PageRank.
+Figure 2: AR hubs by means of b) node strength, c) divergence and d) PageRank.
 """
 
 ## Network parameters
@@ -115,7 +120,7 @@ norm = True # normalization in PageRank
 
 
 # Pick locator depending on panel
-loc = 'head'
+loc = 'centroid'
 
 
 # PIKART
@@ -138,14 +143,14 @@ Gcons = artn.consensus_network([Gpikart, Gtarget], thresh, eps)
 # Choose if multiple testing correciton should be applied
 significance_mode = 'corrected'  # or 'raw'
 # Choose panel
-PANEL = 'a'
+PANEL = 'b'
 # Significance tests: centroid or head
 l_signif_tests = [l_Gcons_rndm_head, l_Gcons_genesis_head, l_Gcons_term_head, l_Gcons_rewired_head]
 
 
-# %% PANEL A -  NODE STRENGTH
+# %% PANEL B -  NODE STRENGTH
 
-if PANEL == 'a':    
+if PANEL == 'b':    
     # Prepare dataframe for plotting
     Gplot = Gcons.copy()
     l_hexID = list(nx.get_node_attributes(Gplot, "coordID").values())
@@ -249,9 +254,9 @@ if PANEL == 'a':
 
 
 
-# %% PANEL B - DIVERGENCE
+# %% PANEL C - DIVERGENCE
 
-elif PANEL == 'b':
+elif PANEL == 'c':
     # --- Generate dataframe for real data ---
     Gplot = Gcons.copy()
     l_hexID = list(nx.get_node_attributes(Gplot, "coordID").values())
@@ -338,17 +343,9 @@ elif PANEL == 'b':
 
 
 
-# %% PANEL C - PAGERANK
+# %% PANEL D - PAGERANK
 
-#""" WORKS WITH AR HEADS!!! """ 
-
-elif PANEL == 'c':
-    """
-    Key Takeaways
-    PageRank emphasizes persistent, flow-retaining structures rather than just termination points.
-    Your high PageRank regions align with moisture accumulation, recirculation, or persistent guidance by winds/topography.
-    Degree centrality is more about sheer number of connections, while PageRank tells a deeper dynamical story about moisture transport stability and trapping.
-    """
+elif PANEL == 'd':
     # Parameters
     #fdamp = 0.9
     

@@ -1,12 +1,5 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
-
-#------------------ PATH ---------------------------#
-import sys
-PATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/scripts"
-sys.path.insert(0, PATH)
-
-
 
 # %% IMPORT MODULES
 
@@ -29,7 +22,7 @@ from sklearn.preprocessing import binarize
 from timezonefinder import TimezoneFinder
 
 # %% INTERNAL HELPER FUNCTIONS
-# The functions below are not meant to be called from a script but are secondary
+# The functions below (_*) are not meant to be called from a script but are secondary
 # functions that are called by the main functions below.
 
 
@@ -208,8 +201,6 @@ def _is_daytime(dt):
     return 'day' if 6 <= hour < 18 else 'night'
 
 
-
-
 def _lat_lon_to_hash(lat, lon):
     """
     Generate a stable integer hash from latitude and longitude coordinates.
@@ -233,8 +224,6 @@ def _lat_lon_to_hash(lat, lon):
     lat_lon_str = f"{lat:.6f}_{lon:.6f}"  # Ensure consistent formatting
     hash_bytes = hashlib.sha256(lat_lon_str.encode()).digest()
     return int.from_bytes(hash_bytes[:8], byteorder='big', signed=False)  # Use first 8 bytes for 64-bit int
-
-
 
 
 def _invert_hash(h, grid_type, coord_dict=None):
@@ -263,8 +252,7 @@ def _invert_hash(h, grid_type, coord_dict=None):
     elif grid_type == 'hexagonal':
         return h3.h3_to_geo(h)  # Returns (lat, lon) tuple from hexagon index
 
-
-
+s
 def _set_diagonal_zero(A_sparse):
     """
     Set all diagonal elements of a sparse matrix to zero, discarding self-links in the AR network.
@@ -716,10 +704,6 @@ def condition_backwards_to_entry_region(
     ARcat_truncated = pd.concat(kept_segments, ignore_index=True)
     print(f"Kept {ARcat_truncated[id_col].nunique()} unique ARs feeding into the entry region.")
     return ARcat_truncated
-
-
-
-
 
 
 def origins_and_destinations(ARcat, LC_cond=None):
@@ -1531,6 +1515,7 @@ def normalize_outgoing_weights(G):
 def complete_nodes(G, res):
     """
    Add missing hexagonal grid nodes to a graph to ensure full spatial coverage at a given H3 resolution.
+   This is a COSMETIC function. Adding the nodes is not really required.
 
    This function identifies all H3 hexagon cells at a specified resolution that 
    cover the entire globe and ensures that every such cell is represented as a node 

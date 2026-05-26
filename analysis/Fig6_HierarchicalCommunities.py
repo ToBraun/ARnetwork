@@ -1,17 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
-#------------------ PATHS ---------------------------#
-
+#------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
 
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 # %% IMPORT MODULES
 
@@ -33,13 +36,11 @@ from tqdm import tqdm
 import cartopy.crs as ccrs
 from infomap import Infomap
 import geopandas as gpd
-from h3 import h3
 import plotly.graph_objects as go
 import plotly.io as pio
 pio.renderers.default = 'notebook'
 
-
-# my packages
+# local subroutines
 import ARnet_sub as artn
 import NETanalysis_sub as ana
 import NETplots_sub as nplot
@@ -57,17 +58,12 @@ plt.rcParams.update(params)
 mpl.rcParams['axes.linewidth'] = 1.5
 mpl.rcParams['font.size'] = 16
 
-
-
 # %% LOAD DATA
-
 
 # PIKART
 d_ars_pikart = pd.read_pickle(INPUT_PATH + 'PIKART' + '_hex.pkl')
 # tARget v4
 d_ars_target = pd.read_pickle(INPUT_PATH + 'target' + '_hex.pkl')
-
-
 
 # %% Global network with different edge definitions
 
@@ -111,7 +107,9 @@ Gtarget = artn.generate_network(Atarget, t_grid_target, weighted, directed, eps,
 G = artn.consensus_network([Gpikart, Gtarget], 1.25*eps, eps)
 
 
-# %% FUNCTIONS
+# %% COLOR MAPS
+
+# Those cmaps gotta have enough colors for the number of communities at each hierarchical level (generated with IWantHue)
 
 l_cols1 = ['#D3D3D3', "#f4a084", "#8eb680","#a0a9d8", "#25c0b8", "#b5c4aa", "#84e2b6","#ffc0da","#e2e496",
            "#bed1ff"]
@@ -165,10 +163,6 @@ a_lvlcomms0 = a_lvlcomms00[minlvl:maxlvl]
 a_lvlcomms_mask = ana.filter_small_communities(a_lvlcomms0, Nmin)#[1:5]
 a_lvlcomms_filtered = a_lvlcomms0.copy()
 a_lvlcomms_filtered[a_lvlcomms_mask] = -999
-# # FILTERING by flow
-# d_total_flows, d_flow_matrices = ana.module_flow(a_lvlcomms0, d_flows)
-# a_lvlcomms_filtered = ana.filter_by_flow(a_lvlcomms0, d_total_flows, flow_threshold=0.95)
-
 
 # COLOURS: Do colours and communities match...?
 l_cols = l_allcols[nLVL]
@@ -219,7 +213,6 @@ norm = mpl.colors.BoundaryNorm(bounds, len(cmap_colors))
 
 
 # FIGURE
-%matplotlib 
 fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.EqualEarth()})
 ax.set_global()
 ax.add_feature(cfeature.COASTLINE, color='black')
@@ -242,8 +235,7 @@ d_boundaries.boundary.plot(
     edgecolor='black',
     transform=ccrs.PlateCarree()
 )
-plt.savefig('/Users/tbraun/Desktop/' + "Fig6d.png", dpi=600, bbox_inches='tight', transparent=True)
-#plt.savefig(OUTPUT_PATH + "Fig6d.png", dpi=500, bbox_inches='tight')
+plt.savefig(OUTPUT_PATH + "Fig6d.png", dpi=500, bbox_inches='tight')
 
 
 # %% MODULE GRAPHS
@@ -296,7 +288,6 @@ for key in pos:
     pos[key][1] *= 1  # Stretch along y-axis for elongation
 
 
-%matplotlib 
 # FIGURE
 plt.figure(figsize=(10,10))
 ax = plt.gca()
@@ -326,7 +317,6 @@ nx.draw_networkx_nodes(
 
 # Configure plot aesthetics
 plt.axis("off")
-#plt.tight_layout()
 plt.margins(0.1)  # 10% margin on all sides
 plt.savefig(OUTPUT_PATH + "Fig6e.png", dpi=500)
 

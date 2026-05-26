@@ -1,16 +1,20 @@
-# Copyright (C) 2023 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
 #------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/output/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
-SUPP_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/suppl_figures/'
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 # %% IMPORT MODULES
 
@@ -29,7 +33,7 @@ import cartopy.crs as ccrs
 import geopandas as gpd
 import xarray as xr
 
-# my packages
+# local subroutines
 import NETplots_sub as nplot
 
 # %% PLOT PARAMETERS
@@ -55,7 +59,7 @@ def divide_by_ndec(x, pos):
 # %% LOAD DATA
 
 # TOPOGRAPHY (displayed for pagerank)
-dem_ds = xr.open_dataset('/Users/tbraun/Desktop/projects/#A_PIKART_PIK/ARcatalog_shared/scripts/detection&tracking/input_files/hyd_glo_dem_0_75deg.nc')
+dem_ds = xr.open_dataset(INPUT_PATH + 'hyd_glo_dem_0_75deg.nc')
 dem = dem_ds['dem'].isel(time=0)
 
 # %% PARAMETERS
@@ -65,14 +69,14 @@ significance_mode = 'corrected'  # or 'raw'
 # Choose panel
 PANEL = 'c'
 # Confidence level
-alpha = 0.1#05
+alpha = 0.1 #05
 # number of years
 nyear = 83 
 
 
-# %% PANEL A -  NODE STRENGTH
+# %% PANEL B -  NODE STRENGTH
 
-if PANEL == 'a':    
+if PANEL == 'b':    
     # LOAD data
     d_nodestr = gpd.read_file(INPUT_PATH + "nodestr_centroid_consensus.gpkg", layer='nodestr')
 
@@ -143,9 +147,7 @@ if PANEL == 'a':
                    transform=ccrs.PlateCarree(), norm=norm, edgecolor='black', linewidth=.8, legend=False)
     
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2a.png', dpi=600, bbox_inches='tight')
-#    plt.savefig(OUTPUT_PATH + '/Fig3a.png', dpi=300, bbox_inches='tight')
-#    plt.savefig(SUPP_PATH + '/Fig3S2a.png', dpi=300, bbox_inches='tight')
+    plt.savefig(OUTPUT_PATH + '/Fig2b.png', dpi=300, bbox_inches='tight')
 
     
 
@@ -177,14 +179,12 @@ if PANEL == 'a':
     # Adjust layout to fit everything nicely
     plt.subplots_adjust(wspace=0.1, bottom=0.4)
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2a_cbar.png', dpi=600, bbox_inches='tight')
-#    plt.savefig(OUTPUT_PATH + '/Fig3a_cbar.png', dpi=300, bbox_inches='tight')
-#    plt.savefig(SUPP_PATH + '/Fig3S2a_cbar.png', dpi=300, bbox_inches='tight')
+    plt.savefig(OUTPUT_PATH + '/Fig2b_cbar.png', dpi=300, bbox_inches='tight')
 
 
-# %% PANEL B - DIVERGENCE
+# %% PANEL C - DIVERGENCE
 
-elif PANEL == 'b':
+elif PANEL == 'c':
     
     # LOAD data
     d_ndiv = gpd.read_file(INPUT_PATH + "divergence_head_consensus.gpkg", layer='ndiv')
@@ -243,9 +243,7 @@ elif PANEL == 'b':
         pop4.plot(column='ndiv', cmap=cmap2, ax=ax,
                    transform=ccrs.PlateCarree(), norm=norm, edgecolor='black', linewidth=0.5, legend=False)
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2d.png', dpi=600, bbox_inches='tight')
-#    plt.savefig(SUPP_PATH + '/Fig3S2c.png', dpi=300, bbox_inches='tight')
-
+    plt.savefig(OUTPUT_PATH + '/Fig2c.png', dpi=300, bbox_inches='tight')
 
 
     # SEPARATE COLORBAR PLOT
@@ -276,23 +274,16 @@ elif PANEL == 'b':
     # Adjust layout to fit everything nicely
     plt.subplots_adjust(wspace=0.1, bottom=0.4)
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2d_cbar.png', dpi=600, bbox_inches='tight')
-#    plt.savefig(SUPP_PATH + '/Fig3S2b_cbar.png', dpi=300, bbox_inches='tight')
+    plt.savefig(OUTPUT_PATH + '/Fig2c_cbar.png', dpi=300, bbox_inches='tight')
 
 
 
 
-# %% PANEL C - PAGERANK
+# %% PANEL D - PAGERANK
 
 
-elif PANEL == 'c':     
-    """
-    Key Takeaways
-    PageRank emphasizes persistent, flow-retaining structures rather than just termination points.
-    Your high PageRank regions align with moisture accumulation, recirculation, or persistent guidance by winds/topography.
-    Degree centrality is more about sheer number of connections, while PageRank tells a deeper dynamical story about moisture transport stability and trapping.
-    """
-    
+elif PANEL == 'd':     
+
     # LOAD data
     d_pagernk = gpd.read_file(INPUT_PATH + "pagerank_head_consensus.gpkg")
     
@@ -379,8 +370,7 @@ elif PANEL == 'c':
                    transform=ccrs.PlateCarree(), norm=norm, edgecolor='black', linewidth=.8, legend=False, alpha=.9)
     
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2f.png', dpi=600, bbox_inches='tight')
-#    plt.savefig(OUTPUT_PATH + '/Fig3c.png', dpi=300, bbox_inches='tight')
+    plt.savefig(OUTPUT_PATH + '/Fig2d.png', dpi=300, bbox_inches='tight')
 
 
 
@@ -410,6 +400,4 @@ elif PANEL == 'c':
     # Adjust layout to fit everything nicely
     plt.subplots_adjust(wspace=0.1, bottom=0.4)
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2f_cbar.png', dpi=600, bbox_inches='tight')
-#    plt.savefig(SUPP_PATH + '/Fig3S2a_cbar.png', dpi=300, bbox_inches='tight')
-
+    plt.savefig(OUTPUT_PATH + '/Fig2d_cbar.png', dpi=300, bbox_inches='tight')

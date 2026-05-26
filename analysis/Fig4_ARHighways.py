@@ -1,702 +1,301 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
 #------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 # %% IMPORT MODULES
-
-# standard packages
 import numpy as np
-from numpy.polynomial.polynomial import Polynomial
 import pandas as pd
 import matplotlib as mpl
-#mpl.use('Agg')
 from matplotlib import pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.colors import Normalize, LogNorm
+from matplotlib.colors import Normalize, LogNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import ListedColormap
-from matplotlib.lines import Line2D
-import time
-
-# specific packages
-import networkx as nx
-from cmcrameri import cm
-import cartopy.feature as cfeature
 from tqdm import tqdm
-import cartopy.crs as ccrs
-import geopandas as gpd
-from collections import defaultdict
-import random
-import itertools
-import h3 as h3
-from sklearn.metrics import mean_squared_error 
-from sklearn.linear_model import LinearRegression
-from scipy.stats import rankdata, spearmanr
 
-# my packages
+import networkx as nx
+import cartopy.crs as ccrs
+
+# local subroutines
 import ARnet_sub as artn
 import NETanalysis_sub as ana
 import NETplots_sub as nplot
 
 # %% PLOT PARAMETERS
 plt.style.use('default')
-# Update Matplotlib parameters
-colorbar_dir = 'horizontal'
-
-# Change default tick direction
-params = {'xtick.direction': 'in',
-          'ytick.direction': 'in'}
-plt.rcParams.update(params)
+plt.rcParams.update({'xtick.direction': 'in', 'ytick.direction': 'in'})
 mpl.rcParams['axes.linewidth'] = 1.5
 mpl.rcParams['font.size'] = 16
 
-# %% FUNCTIONS
+
+# %%FUNCTIONS
+
+def build_network(ARcat):
+    ARcat = ARcat.copy()
+    ARcat['time'] = pd.to_datetime(ARcat['time']).dt.floor('D')
+    ARcat['lf_lon'] = ARcat['lf_lon'].replace(0, np.nan)
+    l_arcats, d_coord_dict = artn.preprocess_catalog(
+        ARcat, T, loc, grid_type, X, res, cond, LC_cond
+    )
+    A, t_idx, t_hexidx, t_ivt, t_grid = artn.generate_transport_matrix(
+        l_arcats, grid_type, d_coord_dict, LC_cond
+    )
+    G = artn.generate_network(A, t_grid, weighted, directed, eps, self_links, weighing)
+    return G, t_hexidx, t_ivt
 
 # %% LOAD DATA
 
-# PIKART
-d_ars_pikart = pd.read_pickle(INPUT_PATH + 'PIKART' + '_hex.pkl')
-# tARget v4
-d_ars_target = pd.read_pickle(INPUT_PATH + 'target' + '_hex.pkl')
-
-# we also import the untransformed one as it contains the lf_lons needed here (only)
-d_ars_target_nohex = pd.read_pickle('/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/data/' + 'tARget_globalARcatalog_ERA5_1940-2023_v4.0_converted_lf.pkl')
+d_ars_pikart = pd.read_pickle(INPUT_PATH / 'PIKART_hex.pkl')
+d_ars_target = pd.read_pickle(INPUT_PATH / 'target_hex.pkl')
+d_ars_target_nohex = pd.read_pickle(
+    '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/data/'
+    'tARget_globalARcatalog_ERA5_1940-2023_v4.0_converted_lf.pkl'
+)
 d_ars_target['lf_lon'] = d_ars_target_nohex['lf_lon']
 d_ars_target['lf_lat'] = d_ars_target_nohex['lf_lat']
 
 
-
 # %% AR NETWORK
 
-
-## Network parameters
-# spatiotemporal extent
-T = None # no clipping
+# Network parameters
+T = None
 X = 'global'
-# nodes
-res = 2 # h3 system, corresponds to closest resolution to 2 degrees
+res = 2                  # H3 resolution ~ 2 degrees
 grid_type = 'hexagonal'
 loc = 'centroid'
-# edges
 weighing = 'absolute'
 self_links = False
 weighted = True
 directed = True
-ndec = 8.4 # number of decades
-eps = int(2*ndec) # threshold: at least 2ARs/decade
-thresh = 1.25*eps
-# conditioning
-cond = None # any network conditioning
-LC_cond = None # lifecycle conditioning
+ndec = 8.4
+eps = int(2 * ndec)      # ≥ 2 ARs / decade
+thresh = 1.25 * eps      # kept for parity with original (unused below)
+cond = None
+LC_cond = None
+
+# ARTNs
+Gpikart, t_hexidx_pikart, t_ivt_pikart = build_network(d_ars_pikart)
+Gtarget, t_hexidx_target, t_ivt_target = build_network(d_ars_target)
 
 
-# PIKART
-ARcat = d_ars_pikart.copy()
-ARcat['time'] = pd.to_datetime(ARcat['time']).dt.floor('D')
-ARcat['lf_lon'] = ARcat['lf_lon'].replace(0, np.nan)
-# Convert landfall latitudes and longitudes to hexagon index
-l_arcats_pikart, d_coord_dict = artn.preprocess_catalog(ARcat, T, loc, grid_type, X, res, cond, LC_cond)
-Apik, t_idx_pikart, t_hexidx_pikart, t_ivt_pikart, t_grid_pikart = artn.generate_transport_matrix(l_arcats_pikart, grid_type, d_coord_dict, LC_cond)
-Gpikart = artn.generate_network(Apik, t_grid_pikart, weighted, directed, eps, self_links, weighing)
+# %% MOISTURE TRANSPORT — assign IVTdiff classes to EDGES and NODES
 
-# tARget
-ARcat = d_ars_target.copy()
-ARcat['time'] = pd.to_datetime(ARcat['time']).dt.floor('D')
-ARcat['lf_lon'] = ARcat['lf_lon'].replace(0, np.nan)
-# Convert landfall latitudes and longitudes to hexagon index
-l_arcats_target, d_coord_dict = artn.preprocess_catalog(ARcat, T, loc, grid_type, X, res, cond, LC_cond)
-Atarget, t_idx_target, t_hexidx_target, t_ivt_target, t_grid_target = artn.generate_transport_matrix(l_arcats_target, grid_type, d_coord_dict, LC_cond)
-Gtarget = artn.generate_network(Atarget, t_grid_target, weighted, directed, eps, self_links, weighing)
-
-
-# %% MOISTURE TRANSPORT
-# Assign quantiles of IVT changes to edges and nodes.
-
-
-""" EDGES """
-# Quantiles
-qh1, qh2, qh3 = np.array([.6, .75, .90])
+qh1, qh2, qh3 = 0.60, 0.75, 0.90
 ql1, ql2, ql3 = 1 - qh1, 1 - qh2, 1 - qh3
 
-# IVT differences
-a_ivt_diffs1 = t_ivt_pikart[0][1] - t_ivt_pikart[0][0]
-a_ivt_diffs2 = t_ivt_target[0][1] - t_ivt_target[0][0]
-a_all_ivtdiffs = np.hstack([a_ivt_diffs1, a_ivt_diffs2])
-
-
-# Thresholds
-a_IVTthresholds = np.hstack([np.nanquantile(a_all_ivtdiffs, ql3),
-                          np.nanquantile(a_all_ivtdiffs, ql2),
-                          np.nanquantile(a_all_ivtdiffs, ql1),
-                          np.nanquantile(a_all_ivtdiffs, qh1),
-                          np.nanquantile(a_all_ivtdiffs, qh2),
-                          np.nanquantile(a_all_ivtdiffs, qh3)])
-edges = np.concatenate(([-np.inf], a_IVTthresholds, [np.inf]))
-
-
-# MOISTURE TRANSPORT
-# PIKART
-tmp_edgesigns1 = ana.compute_edge_moisture_transport(t_hexidx_pikart[0],
-                                                t_ivt_pikart[0],
-                                                output = 'manual',
-                                                thresholds = a_IVTthresholds) 
-G_esigned_pikart = artn.add_edge_attr_to_graph(Gpikart, tmp_edgesigns1, attr_name = 'IVTdiff')
-# tARget
-tmp_edgesigns2 = ana.compute_edge_moisture_transport(t_hexidx_target[0],
-                                                t_ivt_target[0],
-                                                output = 'manual',
-                                                thresholds = a_IVTthresholds) 
-G_esigned_target = artn.add_edge_attr_to_graph(Gtarget, tmp_edgesigns2, attr_name = 'IVTdiff')
-
-    
-    
-""" NODES """
-# PIKART
-tmp_nodesigns1 = ana.compute_node_moisture_transport(t_hexidx_pikart[0],
-                                                    t_ivt_pikart[0],
-                                                    output = 'manual',
-                                                    thresholds = a_IVTthresholds)
-Gsigned_pikart = artn.add_node_attr_to_graph(G_esigned_pikart, tmp_nodesigns1, attr_name = 'IVTdiff')
-
-# tARget
-tmp_nodesigns2 = ana.compute_node_moisture_transport(t_hexidx_target[0],
-                                                    t_ivt_target[0],
-                                                    output = 'manual',
-                                                    thresholds = a_IVTthresholds)
-Gsigned_target = artn.add_node_attr_to_graph(G_esigned_target, tmp_nodesigns2, attr_name = 'IVTdiff')
-
-
-
-# %% PREDICTABILITY
-
-from scipy.stats import pearsonr
-#df = d_ars_pikart.copy()
-
-
-def compute_track_scores(df,
-                         G,
-                         hex_col='hex_idx_centroid_res2',
-                         attr='IVTdiff',
-                         min_length=4,
-                         use_landfall=True,
-                         mode='edge'):
-    """
-    Compute trajectory scores based on traversed edges or nodes,
-    truncated at first landfall.
-    
-    Returns:
-    - DataFrame with sum_score, mean_score, ref_ivt per track
-    """
-    results = []
-
-    for tid, group in tqdm(df.groupby('trackid')):
-        group = group.sort_values('time')
-
-        # --- truncate at first landfall ---
-        if use_landfall and group['lf_lon'].first_valid_index() is not None:
-            lf_idx = group['lf_lon'].first_valid_index()
-            if lf_idx > min_length-1:
-                group = group.loc[:lf_idx]  # keep rows until (and incl.) first landfall
-            else:
-                continue
-        else:
-            continue
-
-        hex_path = group[hex_col].values
-        scores = []
-
-        if mode == 'edge':
-            for u, v in zip(hex_path[:-1], hex_path[1:]):
-                if G.has_edge(u, v):
-                    val = G[u][v].get(attr, np.nan)
-                    scores.append(val)
-        elif mode == 'node':
-            for node in hex_path:
-                if G.has_node(node):
-                    val = G.nodes[node].get(attr, np.nan)
-                    scores.append(val)
-        else:
-            raise ValueError("Invalid mode: choose 'edge' or 'node'")
-
-        # --- apply min_length to pre-landfall section ---
-        scores = np.array(scores, dtype=float)
-        valid_scores = scores[~np.isnan(scores)]
-        if len(valid_scores) < min_length:
-            continue
-
-        sum_score = np.nansum(valid_scores)
-        mean_score = np.nanmean(valid_scores)
-
-        # --- reference IVT at landfall (if available) ---
-        ref_row = group.dropna(subset=['lf_lon']).head(1) if use_landfall else pd.DataFrame()
-        if not ref_row.empty:
-            ref_ivt = ref_row['mean_ivt'].values[0]
-        else:
-            ref_ivt = group['mean_ivt'].iloc[-1]
-
-        results.append({
-            'trackid': tid,
-            'sum_score': sum_score,
-            'mean_score': mean_score,
-            'ref_ivt': ref_ivt,
-            'pre_lf_length': len(group)  # store pre-landfall length for regression
-        })
-
-    return pd.DataFrame(results)
-
-
-# def compute_predictability(df, summary_df):
-#     """
-#     Compute predictability by regressing ref_ivt on mean_score only,
-#     using rank-transformed regression. 
-#     Individual predictability scores max out at the system-level
-#     Spearman correlation.
-#     """
-#     # Predictor (mean_score only)
-#     x_score = summary_df[['mean_score']].values
-#     y = summary_df['ref_ivt'].values
-
-#     # --- Rank-transform data ---
-#     X_ranked = rankdata(x_score.flatten()).reshape(-1, 1)
-#     y_ranked = rankdata(y)
-
-#     # --- Fit rank regression ---
-#     model = LinearRegression().fit(X_ranked, y_ranked)
-#     y_pred_rank = model.predict(X_ranked)
-
-#     # --- Residuals in rank space ---
-#     res = np.abs(y_ranked - y_pred_rank)
-
-#     # --- System-level predictability = Spearman correlation ---
-#     rho, _ = spearmanr(x_score.flatten(), y)
-#     rho = max(rho, 0)  # clip at 0 so it doesn’t go negative
-
-#     # Robust system scale
-#     R_system = np.median(res) + 1e-12  
-
-#     # --- Per-observation predictability ---
-#     predictability = rho / (res / R_system + 1)
-
-#     # --- Collect landfalls (first only) ---
-#     landfalls = []
-#     for tid, group in tqdm(df.groupby('trackid')):
-#         lf_row = group.dropna(subset=['lf_lon']).head(1)
-#         if not lf_row.empty and tid in summary_df['trackid'].values:
-#             lon = lf_row['lf_lon'].iloc[0]
-#             lat = lf_row['lf_lat'].iloc[0]
-#             ivt = summary_df.loc[summary_df['trackid'] == tid, 'ref_ivt'].values[0]
-#             pred = predictability[np.where(summary_df['trackid'] == tid)][0]
-#             landfalls.append((lon, lat, ivt, pred))
-
-#     return pd.DataFrame(landfalls, columns=['lon', 'lat', 'ivt', 'pred'])
-
-
-from sklearn.linear_model import HuberRegressor
-
-def compute_predictability(df, summary_df, epsilon=1.35):
-    """
-    Compute predictability by regressing ref_ivt on mean_score only,
-    using Huber regression (robust linear regression).
-    Individual predictability scores max out at the system-level
-    Pearson R^2.
-    """
-    # Predictor (mean_score only)
-    x_score = summary_df[['mean_score']].values
-    y = summary_df['ref_ivt'].values
-
-    # --- Fit Huber regression ---
-    model = HuberRegressor(epsilon=epsilon).fit(x_score, y)
-    y_pred = model.predict(x_score)
-
-    # --- Residuals in value space ---
-    res = np.abs(y - y_pred)
-
-    # --- System-level predictability = Pearson R^2 ---
-    r, _ = pearsonr(x_score.flatten(), y)
-    R2 = max(r, 0)  # enforce non-negativity
-
-    # Robust system scale
-    R_system = np.median(res) + 1e-12
-
-    # --- Per-observation predictability ---
-    predictability = R2 / (res / R_system + 1)
-
-    # --- Collect landfalls (first only) ---
-    landfalls = []
-    for tid, group in tqdm(df.groupby('trackid')):
-        lf_row = group.dropna(subset=['lf_lon']).head(1)
-        if not lf_row.empty and tid in summary_df['trackid'].values:
-            lon = lf_row['lf_lon'].iloc[0]
-            lat = lf_row['lf_lat'].iloc[0]
-            ivt = summary_df.loc[summary_df['trackid'] == tid, 'ref_ivt'].values[0]
-            pred = predictability[np.where(summary_df['trackid'] == tid)][0]
-            landfalls.append((lon, lat, ivt, pred))
-
-    return pd.DataFrame(landfalls, columns=['lon', 'lat', 'ivt', 'pred'])
-
-
-
-def plot_and_correlate(summary_df, color):
-    x = summary_df['mean_score']
-    y = summary_df['ref_ivt']
-
-    mask = (~pd.isna(x)) & (~pd.isna(y))
-    x = x[mask]
-    y = y[mask]
-
-    if len(x) == 0:
-        print(f"No valid data for {score_col}")
-        return
-
-    r, p = pearsonr(x, y)
-
-    plt.figure(figsize=(2,2))
-    plt.scatter(x, y, alpha=0.05, color=color)
-    plt.xlabel('mean trajectory score')
-    plt.ylabel('IVT at landfall (kg m$^{-1}$ s$^{-1}$)')
-    plt.title(f'Pearson R={r:.2f}')
-    plt.xticks([-3,-2,-1,0,1,2,3])
-    plt.show()
-
-    return r, p
-
-
-
-
-def regrid_coords(df, lon_col='lon', lat_col='lat', res=3.0):
-    """Snap lon/lat coordinates to a regular grid of given resolution (degrees)."""
-    df = df.copy()
-    df['lon_bin'] = (df[lon_col] / res).round() * res
-    df['lat_bin'] = (df[lat_col] / res).round() * res
-    df['lonlat'] = df['lon_bin'].astype(str) + "_" + df['lat_bin'].astype(str)
-    return df
-
-
-%matplotlib 
-MODE = 'node'
-
-
-# PIKART
-summary_pikart = compute_track_scores(d_ars_pikart, Gsigned_pikart,
-                                           min_length=4, use_landfall=True,
-                                           mode=MODE)
-plot_and_correlate(summary_pikart, color='darkcyan')
-plt.savefig("/Users/tbraun/Desktop/scatter_nodeIVT_pikart.png", dpi=500, bbox_inches='tight')
-
-# tARget
-summary_target = compute_track_scores(d_ars_target, Gsigned_target,
-                                           min_length=4, use_landfall=True,
-                                           mode=MODE)
-plot_and_correlate(summary_target, color='mediumpurple')
-plt.savefig("/Users/tbraun/Desktop/scatter_nodeIVT_target.png", dpi=500, bbox_inches='tight')
-
-
-
-# --- Compute predictabilities for both catalogs ---
-lf_pikart = compute_predictability(d_ars_pikart, summary_pikart, epsilon=1)#, method='ols')
-lf_target = compute_predictability(d_ars_target, summary_target, epsilon=1)#, method='ols')
-# Convert it to [-180,180] for target
-lf_target.lon = ((lf_target['lon'] + 180) % 360) - 180
-
-
-# Compute average from all AR tracks that make landfall at the same grid cell (lonlat)
-lf_pikart_agg = lf_pikart.groupby(["lon", "lat"], as_index=False).agg({
-    "ivt": "mean",         # average IVT across tracks
-    "pred": "mean"         # average predictability across tracks
-})
-lf_target_agg = lf_target.groupby(["lon", "lat"], as_index=False).agg({
-    "ivt": "mean",         # average IVT across tracks
-    "pred": "mean"         # average predictability across tracks
-})
-
-
-# --- Prepare for merging ---
-# Regrid landfall locations in both catalogs
-lf_pikart_coarse = regrid_coords(lf_pikart_agg, res=5.0)
-lf_target_coarse = regrid_coords(lf_target_agg, res=5.0)
-
-
-# Merge keeping info about source
-merged = pd.merge(lf_pikart_coarse, lf_target_coarse, on='lonlat', suffixes=('_pikart', '_target'), how='outer')
-# Grid cell centers for plotting
-merged['lon'] = merged[['lon_bin_pikart', 'lon_bin_target']].mean(axis=1, skipna=True)
-merged['lat'] = merged[['lat_bin_pikart', 'lat_bin_target']].mean(axis=1, skipna=True)
-
-
-# Average IVT + predictability where both exist
-merged['ivt'] = merged[['ivt_pikart', 'ivt_target']].mean(axis=1, skipna=True)
-merged['pred'] = merged[['pred_pikart', 'pred_target']].mean(axis=1, skipna=True)
-
-# Flags
-merged['has_pikart'] = ~merged['ivt_pikart'].isna()
-merged['has_target'] = ~merged['ivt_target'].isna()
-merged['both'] = merged['has_pikart'] & merged['has_target']
-
-# --- Split populations ---
-df_both = merged[merged['both']]
-df_unique = merged[~merged['both']]
-
-
-%matplotlib 
-# --- Plot ---
-fig, ax = plt.subplots(figsize=(12.6,12.6), subplot_kw={'projection': ccrs.EqualEarth()})
-ax.set_global()
-ax.add_feature(cfeature.COASTLINE, color='black', zorder=2)
-
-# Population B: unique (only one catalog) – no outline
-sc2 = ax.scatter(
-    df_unique['lon'], df_unique['lat'],
-    c=df_unique['pred'],
-    s=df_unique['ivt'] / 9,
-    cmap=cm.batlow_r,      # same colormap
-    transform=ccrs.PlateCarree(),
-    alpha=0.6, #vmin=0, vmax=1,
-    edgecolors="none",     # no outline
-    label="Only one catalog"
+a_ivt_diffs_pikart = t_ivt_pikart[0][1] - t_ivt_pikart[0][0]
+a_ivt_diffs_target = t_ivt_target[0][1] - t_ivt_target[0][0]
+a_all_ivtdiffs = np.hstack([a_ivt_diffs_pikart, a_ivt_diffs_target])
+
+a_IVTthresholds = np.hstack([
+    np.nanquantile(a_all_ivtdiffs, ql3),
+    np.nanquantile(a_all_ivtdiffs, ql2),
+    np.nanquantile(a_all_ivtdiffs, ql1),
+    np.nanquantile(a_all_ivtdiffs, qh1),
+    np.nanquantile(a_all_ivtdiffs, qh2),
+    np.nanquantile(a_all_ivtdiffs, qh3),
+])
+
+# EDGES
+tmp_edgesigns_pikart = ana.compute_edge_moisture_transport(
+    t_hexidx_pikart[0], t_ivt_pikart[0],
+    output='manual', thresholds=a_IVTthresholds,
+)
+G_esigned_pikart = artn.add_edge_attr_to_graph(
+    Gpikart, tmp_edgesigns_pikart, attr_name='IVTdiff'
 )
 
-# Population A: overlap (both catalogs) – thin black outline
-sc1 = ax.scatter(
-    df_both['lon'], df_both['lat'],
-    c=df_both['pred'],
-    s=df_both['ivt'] / 9,
-    cmap=cm.batlow_r,      # same colormap
-    transform=ccrs.PlateCarree(),
-    alpha=0.9, #vmin=0, vmax=1,
-    edgecolors="black",    # thin black circle
-    linewidths=.8,
-    label="Both catalogs"
+tmp_edgesigns_target = ana.compute_edge_moisture_transport(
+    t_hexidx_target[0], t_ivt_target[0],
+    output='manual', thresholds=a_IVTthresholds,
+)
+G_esigned_target = artn.add_edge_attr_to_graph(
+    Gtarget, tmp_edgesigns_target, attr_name='IVTdiff'
 )
 
-# Shared colorbar
-cb = plt.colorbar(sc1, ax=ax, shrink=0.5, orientation='vertical', pad=0.05)
-cb.ax.tick_params(labelsize=16)
-cb.set_label('Predictability of IVT at landfall', fontsize=16)
-
-plt.savefig("/Users/tbraun/Desktop/Fig2b_predict.png", dpi=500, bbox_inches='tight')
-
-
-
-# Choose some representative IVT values for the legend (adjust as needed)
-ivt_vals = [200, 400, 600, 800, 1000]  # kg m^-1 s^-1
-marker_sizes = [v / 9 for v in ivt_vals]  # must match your scaling
-
-# Create legend handles
-handles = [
-    plt.scatter([], [], s=ms, color="gray", alpha=0.6, edgecolors="none")
-    for ms in marker_sizes
-]
-
-# Add size legend
-size_legend = ax.legend(
-    handles,
-    [f"{v}" for v in ivt_vals],
-    title="IVT at landfall (kg m$^{-1}$ s$^{-1}$)",
-    loc="lower left",
-    fontsize=14,
-    title_fontsize=14,
-    frameon=True
+# NODES (still needed for the consensus averaging step)
+tmp_nodesigns_pikart = ana.compute_node_moisture_transport(
+    t_hexidx_pikart[0], t_ivt_pikart[0],
+    output='manual', thresholds=a_IVTthresholds,
+)
+Gsigned_pikart = artn.add_node_attr_to_graph(
+    G_esigned_pikart, tmp_nodesigns_pikart, attr_name='IVTdiff'
 )
 
-# Add population legend (both vs only one catalog)
-ax.legend(loc="upper left", fontsize=14, frameon=True)
-ax.add_artist(size_legend)  # keep both legends
-
-#ax.legend(loc="lower left")
-plt.show()
-plt.savefig("/Users/tbraun/Desktop/Fig2b_predict.pdf", dpi=500, bbox_inches='tight')
-
+tmp_nodesigns_target = ana.compute_node_moisture_transport(
+    t_hexidx_target[0], t_ivt_target[0],
+    output='manual', thresholds=a_IVTthresholds,
+)
+Gsigned_target = artn.add_node_attr_to_graph(
+    G_esigned_target, tmp_nodesigns_target, attr_name='IVTdiff'
+)
 
 
 # %% EDGE BETWEENNESS: EBC CONSENSUS
-# Compute edge betweenness centrality to all edges & average for consensus network
+# Edge betweenness on each catalog, then average for the consensus network.
 
-# LOOP OVER CATALOGS
 l_Gs = [Gsigned_pikart, Gsigned_target]
 l_Gbetw_phases = []
 for n in range(2):
-    # Invert weights so that shortest paths correspond to maximum weight paths:
+    # Invert weights so that shortest paths correspond to maximum weight paths
     G = ana.invert_weights(l_Gs[n])
-    # EBC
     d_ebetw = nx.edge_betweenness_centrality(G, weight='weight')
     nx.set_edge_attributes(G, d_ebetw, "edge_betweenness")
     l_Gbetw_phases.append(G)
 
-# Averaging of edge betweenness, edge weights and IVT classes:
-Gcons0 = artn.average_networks_by_attributes(l_Gbetw_phases[0], l_Gbetw_phases[1], attr_name= "IVTdiff")
-# Complete nodes for plotting
+# Average EBC, edge weights, and IVT classes
+Gcons0 = artn.average_networks_by_attributes(
+    l_Gbetw_phases[0], l_Gbetw_phases[1], attr_name="IVTdiff"
+)
 Gcons = artn.complete_nodes(Gcons0, res)
 
-# %% HIGHWAYS - panel a
-
-Gcons = Greal.copy()
-
-# CAUTION: only show edges that are significant for suppl. figure, OR SET ZERO!!!!
-EBCTHRESH = 0 #0.0058
-
-# Define colornorm based on ALL EBC values with log-scaling
+# %% HIGHWAYS — panel a
+ 
+# Threshold for edge display (set to 0 to show all; use ~0.0058 for the
+# supplementary "significant edges only" version)
+EBCTHRESH = 0
+ 
+# Log-scaled colour norm across ALL EBC values (consensus + both catalogs)
 l_allweights = [[data['edge_betweenness'] for _, _, data in Gcons.edges(data=True)]]
 for nph in range(2):
-    l_allweights.extend([data['edge_betweenness'] for _, _, data in l_Gbetw_phases[nph].edges(data=True)])
+    l_allweights.extend(
+        [data['edge_betweenness'] for _, _, data in l_Gbetw_phases[nph].edges(data=True)]
+    )
 a_allweights = np.hstack(l_allweights)
 wmax = np.nanmax(a_allweights)
-# discard zeros in color scaling
 norm = LogNorm(vmin=np.nanmin(a_allweights[a_allweights > 0]), vmax=wmax)
-
-
+ 
 # Plot settings
 proj = ccrs.EqualEarth(central_longitude=0)
-d_position = {i: proj.transform_point(Gcons.nodes[i]['Longitude'], Gcons.nodes[i]['Latitude'],
-                                      src_crs=ccrs.PlateCarree()) for i in Gcons.nodes}
+d_position = {
+    i: proj.transform_point(Gcons.nodes[i]['Longitude'], Gcons.nodes[i]['Latitude'],
+                            src_crs=ccrs.PlateCarree())
+    for i in Gcons.nodes
+}
 l_colmaps = [plt.get_cmap('Purples'), plt.get_cmap('Greens')]
-l_alphas = [.6, .6]
-
-# FIGURE
-%matplotlib 
+l_alphas = [0.6, 0.6]
+ 
 fig, ax = plt.subplots(subplot_kw={'projection': proj}, figsize=(10, 10))
 ax.set_global()
 ax.coastlines(color='black', linewidth=0.5)
 nplot.plot_nodes(ax, Gcons, d_position)
-
-# Plot CONSENSUS
+ 
+# Consensus edges (greys)
+CMAP_cons = plt.get_cmap('Greys')
 for node1, node2 in tqdm(Gcons.edges()):
     edge_weight = Gcons.edges[node1, node2]['edge_betweenness']
     if edge_weight < EBCTHRESH:
-        continue  # Skip edges below threshold
-
+        continue
     width = edge_weight / wmax
-    CMAP = plt.get_cmap('Greys')
-    color = CMAP(norm(edge_weight))
+    color = CMAP_cons(norm(edge_weight))
     lon1, lat1 = Gcons.nodes[node1]['Longitude'], Gcons.nodes[node1]['Latitude']
     lon2, lat2 = Gcons.nodes[node2]['Longitude'], Gcons.nodes[node2]['Latitude']
-    segments = nplot.split_edges_at_meridian(lon1, lat1, lon2, lat2)
-    for segment in segments:
-        (lon1, lat1), (lon2, lat2) = segment
+    for (lon1, lat1), (lon2, lat2) in nplot.split_edges_at_meridian(lon1, lat1, lon2, lat2):
         nplot.draw_curved_edge_with_arrow(
-            ax, lon1, lat1, lon2, lat2, color, width, ax.projection, 
-            False, l0=10, curvature=0.3, alpha=1, arrow_size=0
+            ax, lon1, lat1, lon2, lat2, color, width, ax.projection,
+            False, l0=10, curvature=0.3, alpha=1, arrow_size=0,
         )
-
-
-k=0
-for nph in [0,1]:
+ 
+# PIKART (purples) and tARget (greens) overlays
+for k, nph in enumerate([0, 1]):
     Gplot = l_Gbetw_phases[nph]
-    CMAP = l_colmaps[k] 
-
-    # Plot edges with color mapping
+    CMAP = l_colmaps[k]
     for node1, node2 in tqdm(Gplot.edges()):
         edge_weight = Gplot.edges[node1, node2]['edge_betweenness']
         if edge_weight < EBCTHRESH:
-            continue  # Skip edges below threshold
-
-
+            continue
         width = edge_weight / wmax
-        
-        # Map the edge weight to a color in the colormap
         color = CMAP(norm(edge_weight))
-        
-        # Get node coordinates
         lon1, lat1 = Gplot.nodes[node1]['Longitude'], Gplot.nodes[node1]['Latitude']
         lon2, lat2 = Gplot.nodes[node2]['Longitude'], Gplot.nodes[node2]['Latitude']
-        
-        # Split and draw edge segments
-        segments = nplot.split_edges_at_meridian(lon1, lat1, lon2, lat2)
-        for segment in segments:
-            (lon1, lat1), (lon2, lat2) = segment
+        for (lon1, lat1), (lon2, lat2) in nplot.split_edges_at_meridian(lon1, lat1, lon2, lat2):
             nplot.draw_curved_edge_with_arrow(
-                ax, lon1, lat1, lon2, lat2, color, width, ax.projection, 
-                False, l0=10, curvature=0.3, alpha=l_alphas[k], arrow_size=0
+                ax, lon1, lat1, lon2, lat2, color, width, ax.projection,
+                False, l0=10, curvature=0.3, alpha=l_alphas[k], arrow_size=0,
             )
-    k+=1
-
-
+ 
 plt.show()
 plt.savefig(OUTPUT_PATH + "Fig4a.png", dpi=500, bbox_inches='tight')
-
-
-
-# SEPARATE COLORBAR PLOT
+ 
+ 
+# Separate colourbar figure
 cbar_fig, cbar_axs = plt.subplots(1, 3, figsize=(25, 0.4))
 fs = 20
-# Create a colorbar for each colormap
-cbar0 = plt.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap('Purples'), norm=norm), cax=cbar_axs[0], orientation='horizontal')
+cbar0 = plt.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap('Purples'), norm=norm),
+                     cax=cbar_axs[0], orientation='horizontal')
 cbar0.set_label('EBC (PIKART)', color='black', fontsize=fs)
-cbar0.ax.tick_params(labelsize=fs)  
-
-cbar1 = plt.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap('Greys'), norm=norm), cax=cbar_axs[1], orientation='horizontal')
+cbar0.ax.tick_params(labelsize=fs)
+ 
+cbar1 = plt.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap('Greys'), norm=norm),
+                     cax=cbar_axs[1], orientation='horizontal')
 cbar1.set_label('EBC (consensus)', color='black', fontsize=fs)
-cbar1.ax.tick_params(labelsize=fs)  
-
-cbar2 = plt.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap('Greens'), norm=norm), cax=cbar_axs[2], orientation='horizontal')
+cbar1.ax.tick_params(labelsize=fs)
+ 
+cbar2 = plt.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap('Greens'), norm=norm),
+                     cax=cbar_axs[2], orientation='horizontal')
 cbar2.set_label('EBC (tARget-4)', color='black', fontsize=fs)
-cbar2.ax.tick_params(labelsize=fs)  
-# Adjust layout to avoid overlap
+cbar2.ax.tick_params(labelsize=fs)
+ 
 plt.subplots_adjust(wspace=0.1)
 plt.show()
 plt.savefig(OUTPUT_PATH + "Fig4a_cbar.png", dpi=500, bbox_inches='tight')
-
-
-
-# %% MOISTURE along EDGES - panel b
-
-# Input graph
+ 
+ 
+# %% MOISTURE along EDGES — panel b
+ 
 Gplot = Gcons.copy()
-
-
-# Plot settings
+ 
 proj = ccrs.EqualEarth(central_longitude=0)
-d_position = {i: proj.transform_point(Gplot.nodes[i]['Longitude'], Gplot.nodes[i]['Latitude'],
-                                      src_crs=ccrs.PlateCarree()) for i in Gplot.nodes}
-
-# EDGE WIDTHS: EBC
+d_position = {
+    i: proj.transform_point(Gplot.nodes[i]['Longitude'], Gplot.nodes[i]['Latitude'],
+                            src_crs=ccrs.PlateCarree())
+    for i in Gplot.nodes
+}
+ 
+# Edge widths from EBC
 a_weights = np.array([data['edge_betweenness'] for _, _, data in Gplot.edges(data=True)])
 wmax = np.nanmax(a_weights)
 linewidth = 5
-# COLOURS: moisture transport
+ 
+# Colours from moisture transport class
 a_ecolours, a_ewidths = nplot.get_edge_signs(Gplot, attr='IVTdiff', linewidth=linewidth)
-CMAP = ListedColormap(['#B22222', '#E66100', '#FDB863', '#999999', 'deepskyblue', 'dodgerblue', 'navy'])
-norm = Normalize(vmin=-3, vmax=3)#
-
-
-# FIGURE
-%matplotlib 
+CMAP = ListedColormap(['#B22222', '#E66100', '#FDB863', '#999999',
+                       'deepskyblue', 'dodgerblue', 'navy'])
+norm = Normalize(vmin=-3, vmax=3)
+ 
 fig, ax = plt.subplots(subplot_kw={'projection': proj}, figsize=(10, 10))
 ax.set_global()
 ax.coastlines(color='black', linewidth=0.5)
 nplot.plot_nodes(ax, Gplot, d_position)
-k=0
-for node1, node2 in tqdm(Gplot.edges()):
+ 
+for k, (node1, node2) in enumerate(tqdm(Gplot.edges())):
     edgecol = a_ecolours[k]
     edge_weight = Gplot.edges[node1, node2]['edge_betweenness']
     width = edge_weight / wmax
-    # Map the edge weight to a color in the colormap
     color = CMAP(norm(edgecol))
-    # Get node coordinates
     lon1, lat1 = Gplot.nodes[node1]['Longitude'], Gplot.nodes[node1]['Latitude']
     lon2, lat2 = Gplot.nodes[node2]['Longitude'], Gplot.nodes[node2]['Latitude']
-    # Split and draw edge segments
-    segments = nplot.split_edges_at_meridian(lon1, lat1, lon2, lat2)
-    for segment in segments:
-        (lon1, lat1), (lon2, lat2) = segment
+    for (lon1, lat1), (lon2, lat2) in nplot.split_edges_at_meridian(lon1, lat1, lon2, lat2):
         nplot.draw_curved_edge_with_arrow(
-            ax, lon1, lat1, lon2, lat2, color, width, ax.projection, 
-            False, l0=10, curvature=0.3, alpha=0.75, arrow_size=0
+            ax, lon1, lat1, lon2, lat2, color, width, ax.projection,
+            False, l0=10, curvature=0.3, alpha=0.75, arrow_size=0,
         )
-    k += 1
-
-
-# Add colorbar
+ 
+# Colourbar with IVT-threshold tick labels
 sm = ScalarMappable(norm=norm, cmap=CMAP)
-sm.set_array([])  
+sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax, orientation='horizontal', pad=0.04, aspect=30, shrink=0.8)
 cbar.set_label('Net IVT change (kg/ms)', fontsize=18)
 cbar.ax.tick_params(labelsize=14)
@@ -704,117 +303,12 @@ bin_edges = np.linspace(-3, 3, 8)
 tick_positions = 0.5 * (bin_edges[:-1] + bin_edges[1:])
 cbar.set_ticks(tick_positions)
 tick_labels = (
-    [f"< {a_IVTthresholds[0]:.0f}"] +
-    [f"({lo:.0f},{hi:.0f})" for lo, hi in zip(a_IVTthresholds[:-1], a_IVTthresholds[1:])] +
-    [f"{a_IVTthresholds[-1]:.0f} <"]
+    [f"< {a_IVTthresholds[0]:.0f}"]
+    + [f"({lo:.0f},{hi:.0f})" for lo, hi in zip(a_IVTthresholds[:-1], a_IVTthresholds[1:])]
+    + [f"{a_IVTthresholds[-1]:.0f} <"]
 )
 cbar.set_ticklabels(tick_labels)
 plt.show()
-plt.savefig('/Users/tbraun/Desktop/' + "Fig4b.png", dpi=600, bbox_inches='tight', transparent=True)
-#plt.savefig(OUTPUT_PATH + "Fig4b.png", dpi=500, bbox_inches='tight')
-
-
-
-
-# %% MOISTURE along NODES - panel c
-
-# Input graph
-Gplot = Gcons.copy()
-
-# Project node positions
-proj = ccrs.EqualEarth(central_longitude=0)
-d_position = {
-    i: proj.transform_point(Gplot.nodes[i]['Longitude'], Gplot.nodes[i]['Latitude'],
-                            src_crs=ccrs.PlateCarree()) for i in Gplot.nodes
-}
-
-# Extract data
-signs = np.array([
-    int(round(s)) if pd.notnull(s) else 0
-    for s in (Gplot.nodes[i].get('sign', 0) for i in Gplot.nodes)
-])
-abs_signs = np.abs(signs)
-max_sign = np.nanmax(abs_signs)
-
-# Parameters
-size_scale = 50  # bubble size scaling
-coords = list(d_position.values())
-x_coords, y_coords = zip(*coords)
-
-# Define color map for each sign
-sign_color_map = {
-    -3: 'darkred',
-    -2: 'peru',
-    -1: 'gold',
-     0: '#aaaaaa',
-     1: 'deepskyblue',
-     2: 'dodgerblue',
-     3: 'darkblue',
-}
-
-# Assign colors and sizes
-colors = [sign_color_map.get(s, '#aaaaaa') for s in signs]
-sizes = [
-    size_scale * (abs(s) / max_sign) if not np.isclose(s, 0) else size_scale * 0.2
-    for s in signs
-]
-
-# PLOT
-fig, ax = plt.subplots(subplot_kw={'projection': proj}, figsize=(10, 10))
-ax.set_global()
-ax.coastlines(color='black', linewidth=0.5)
-
-# Scatter nodes
-sc = ax.scatter(x_coords, y_coords,
-                s=sizes,
-                c=colors,
-                alpha=[0.3 if s == 0 else 0.7 for s in signs],
-                linewidths=0.3,
-                zorder=10)
-
-# === Custom Legend ===
-# legend_elements = [
-#     Line2D([0], [0], marker='o', color='w', label='Strong Loss',
-#            markerfacecolor='darkred', markersize=12),
-#     Line2D([0], [0], marker='o', color='w', label='Moderate Loss',
-#            markerfacecolor='peru', markersize=10),
-#     Line2D([0], [0], marker='o', color='w', label='Weak Loss',
-#            markerfacecolor='gold', markersize=8),
-#     Line2D([0], [0], marker='o', color='w', label='Neutral',
-#            markerfacecolor='#aaaaaa', markersize=7),
-#     Line2D([0], [0], marker='o', color='w', label='Weak Gain',
-#            markerfacecolor='deepskyblue', markersize=8),
-#     Line2D([0], [0], marker='o', color='w', label='Moderate Gain',
-#            markerfacecolor='dodgerblue', markersize=10),
-#     Line2D([0], [0], marker='o', color='w', label='Strong Gain',
-#            markerfacecolor='darkblue', markersize=12),
-# ]
-tick_labels = (
-    [f"< {a_IVTthresholds[0]:.0f}"] +
-    [f"({lo:.0f},{hi:.0f})" for lo, hi in zip(a_IVTthresholds[:-1], a_IVTthresholds[1:])] +
-    [f"{a_IVTthresholds[-1]:.0f} <"]
-)
-legend_labels = tick_labels  # use the same tick labels
-legend_colors = ['#B22222', '#E66100', '#FDB863', '#999999', 'deepskyblue', 'dodgerblue', 'navy']
-legend_sizes = [12, 11, 10, 9, 10, 11, 12]  # optional: scale by importance
-
-legend_elements = [
-    Line2D([0], [0], marker='o', color='w', label=label,
-           markerfacecolor=color, markersize=size)
-    for label, color, size in zip(legend_labels, legend_colors, legend_sizes)
-]
-
-
-# Place legend ABOVE the plot
-fig.legend(handles=legend_elements, title='Net IVT change (kg/ms)',
-           loc='lower center', bbox_to_anchor=(0.5, 0.12),
-           ncol=4, fontsize=14, title_fontsize=16, frameon=False)
-
-# Show or save
-plt.subplots_adjust(top=0.9)  # make space for legend
-plt.show()
-plt.savefig(OUTPUT_PATH + "Fig4c.png", dpi=500, bbox_inches='tight')
-
-
+plt.savefig(OUTPUT_PATH + "Fig4b.png", dpi=600, bbox_inches='tight', transparent=True)
 
 

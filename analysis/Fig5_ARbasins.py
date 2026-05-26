@@ -1,16 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
-#------------------ PATHS ---------------------------#
-
+#------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/Nature/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/Nature/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 
 # %% IMPORT MODULES
@@ -36,15 +40,9 @@ from cmcrameri import cm
 import cartopy.feature as cfeature
 from tqdm import tqdm
 import cartopy.crs as ccrs
-import geopandas as gpd
-from collections import defaultdict
-import random
-import itertools
-import netCDF4 as nc
-import h3 as h3
-from shapely.geometry import shape, mapping, Polygon, MultiPolygon, Point
+from shapely.geometry import Point
 
-# my packages
+# local subroutines
 import ARnet_sub as artn
 import NETanalysis_sub as ana
 import NETplots_sub as nplot
@@ -62,6 +60,16 @@ plt.rcParams.update(params)
 mpl.rcParams['axes.linewidth'] = 1.5
 mpl.rcParams['font.size'] = 20
 
+# manually defined set of colours, generated using IwantHue
+l_cols = ['#D3D3D3', "#14bcda", "#b6ffde", "#7cfceb", "#ffdf9c", "#a2b273", "#7ffffc",
+           "#cf9fa9", "#4fcdff", "#c0d2b8", "#b4a2e3", "#9ee4ff", "#54b8d6",
+           "#deffb6", "#d9a2e3", "#ffa6b3", "#afaf78", "#29c1b8", "#33d2f4", "#d8d0ff",
+           "#cce3cb", "#eab278", "#83e6bd", "#a6c1ab", "#81d3a1", "#81afe7", "#7eb4c4", "#bbab6e",
+           "#71b9a2", "#c0d8ff", "#aedbdf", "#ffd4ff", "#ccffd0", "#e89595", "#b9a4c3",
+           "#90b49e", "#c7ffe0", "#ffd0e4", "#cdb7ff", "#ffe0aa", "#87b789", "#9bc783",
+           "#ffcfbf", "#c3cd81", "#cafcff", "#e4ffdc", "#ffbdf0", "#d09cc0", "#87b4ad",
+           "#bbbcff", "#65e1cb", "#ffc4f2", "#f2de92", "#fffbc1", "#35d4d9", "#54b8f4",
+           "#ffb8c1", "#f4c383", "#7ef4ff", "#d7d084", "#bbda91"]
 
 # %% FUNCTIONS
 
@@ -120,7 +128,7 @@ G = nx.relabel_nodes(G, dict(zip(list(G.nodes()), range(len(list(G.nodes()))))))
 # PARAMETERS
 use_node_weights_as_flow = True
 Nmin = 15
-SEEED = 38.22204983288413
+SEEED = 38.22204983288413 # nasty hard-coded most representative realization
 
 ## INFOMAP ALGORITHM - NON-HIERARCHICAL VERSION
 communities = ana.detect_non_hierarchical_communities(G, 
@@ -163,22 +171,7 @@ d_node_comm = d_node_comm.set_geometry('geometry');
 
 
 
-# %% COMMUNITY FIGURE
-
-# manually defined set of colours, generated using IwantHue
-l_cols = ['#D3D3D3', "#14bcda", "#b6ffde", "#7cfceb", "#ffdf9c", "#a2b273", "#7ffffc",
-           "#cf9fa9", "#4fcdff", "#c0d2b8", "#b4a2e3", "#9ee4ff", "#54b8d6",
-           "#deffb6", "#d9a2e3", "#ffa6b3", "#afaf78", "#29c1b8", "#33d2f4", "#d8d0ff",
-           "#cce3cb", "#eab278", "#83e6bd", "#a6c1ab", "#81d3a1", "#81afe7", "#7eb4c4", "#bbab6e",
-           "#71b9a2", "#c0d8ff", "#aedbdf", "#ffd4ff", "#ccffd0", "#e89595", "#b9a4c3",
-           "#90b49e", "#c7ffe0", "#ffd0e4", "#cdb7ff", "#ffe0aa", "#87b789", "#9bc783",
-           "#ffcfbf", "#c3cd81", "#cafcff", "#e4ffdc", "#ffbdf0", "#d09cc0", "#87b4ad",
-           "#bbbcff", "#65e1cb", "#ffc4f2", "#f2de92", "#fffbc1", "#35d4d9", "#54b8f4",
-           "#ffb8c1", "#f4c383", "#7ef4ff", "#d7d084", "#bbda91"]
-
-
-
-%matplotlib
+# %% COMMUNITY FIGURE - Fig5a
 
 # Define the color mapping with gray for -1
 unique_values = sorted(d_node_comm['community'].unique())  # Get all unique values in 'degc'
@@ -241,11 +234,9 @@ plt.savefig(OUTPUT_PATH + "Fig5a.png", dpi=500, bbox_inches='tight')
 
 
 
-
-# %% IVT DIFFERENCE FIGURE
 # %% UPSTREAM NETWORKS
 
-# Pick a lower threshold cause some communities are not visited that frequently
+# Pick a pretty low threshold cause some communities are not visited that frequently
 eps = 2
 
 # IVT differences
@@ -312,7 +303,7 @@ for ncomm in tqdm(unique_values[1:]):
     linewidth = 5
     # COLOURS: moisture transport
     a_ecolours, a_ewidths = nplot.get_edge_signs(Gplot, 'IVTdiff', linewidth)
-    CMAP = ListedColormap(['#B22222', '#E66100', '#FDB863', '#999999', 'deepskyblue', 'dodgerblue', 'navy'])
+    CMAP_mt = ListedColormap(['#B22222', '#E66100', '#FDB863', '#999999', 'deepskyblue', 'dodgerblue', 'navy'])
     norm = Normalize(vmin=-3, vmax=3)#
     
     
@@ -321,8 +312,6 @@ for ncomm in tqdm(unique_values[1:]):
     d_boundaries = community_mask.dissolve(by='community', as_index=False)
     d_boundaries['geometry'] = d_boundaries.buffer(0.01).buffer(-0.01)
 
-    
-    
     # Determine hemisphere based on the community centroid
     centroid_lat = d_boundaries.geometry.centroid.y.values[0]
     
@@ -337,11 +326,9 @@ for ncomm in tqdm(unique_values[1:]):
     lon_min, lon_max = -180, 180
 
     # FIGURE
-    %matplotlib 
     fig, ax = plt.subplots(subplot_kw={'projection': proj}, figsize=(10, 10))
     ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
 
-#    ax.set_global()
     ax.coastlines(color='black', linewidth=0.5)
     nplot.plot_nodes(ax, Gplot, d_position)
     k=0
@@ -350,7 +337,7 @@ for ncomm in tqdm(unique_values[1:]):
         edge_weight = np.abs(Gplot.edges[node1, node2]['IVTdiff'])
         width = edge_weight / wmax
         # Map the edge weight to a color in the colormap
-        color = CMAP(norm(edgecol))
+        color = CMAP_mt(norm(edgecol))
         # Get node coordinates
         lon1, lat1 = Gplot.nodes[node1]['Longitude'], Gplot.nodes[node1]['Latitude']
         lon2, lat2 = Gplot.nodes[node2]['Longitude'], Gplot.nodes[node2]['Latitude']
@@ -379,11 +366,11 @@ for ncomm in tqdm(unique_values[1:]):
     # Plot the boundary of the community
     d_boundaries.boundary.plot(ax=ax, edgecolor='black', linewidth=2, zorder=5, transform=ccrs.PlateCarree())
     plt.show()
-    plt.savefig("/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/results/backwards_networks_into_communities/centroids/" + "backwnet_into_comm" + str(ncomm) + ".png", dpi=500, bbox_inches='tight')
+    plt.savefig(OUTPUT_PATH + "backwnet_into_comm" + str(ncomm) + ".png", dpi=500, bbox_inches='tight')
 
     if ncomm == 1:
-        # Add colorbar
-        sm = ScalarMappable(norm=norm, cmap=CMAP)
+        # Add colorbar (only once)
+        sm = ScalarMappable(norm=norm, cmap=CMAP_mt)
         sm.set_array([])  
         cbar = plt.colorbar(sm, ax=ax, orientation='horizontal', pad=0.04, aspect=30, shrink=0.8)
         cbar.set_label('Net IVT change (kg/ms)', fontsize=18)
@@ -399,6 +386,6 @@ for ncomm in tqdm(unique_values[1:]):
         )
         cbar.set_ticklabels(tick_labels)
         plt.show()
-        plt.savefig("/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/results/backwards_networks_into_communities/centroids/cbar.pdf", dpi=500, bbox_inches='tight')
+        plt.savefig(OUTPUT_PATH + "cbar.pdf", dpi=500, bbox_inches='tight')
 
 

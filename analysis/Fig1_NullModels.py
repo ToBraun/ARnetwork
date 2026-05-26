@@ -1,14 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
 #------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/random_graphs/'
+from pathlib import Path
+import os
+
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 
 # %% IMPORT MODULES
@@ -21,11 +27,10 @@ from matplotlib import pyplot as plt
 # specific packages
 import networkx as nx
 from tqdm import tqdm
-import cartopy.crs as ccrs
 
-# my packages
+# local subroutines
 import ARnet_sub as artn
-import nullmodels as model
+import NULLmodels_sub as model
 
 # %% PLOT PARAMETERS
 plt.style.use('dark_background')
@@ -41,7 +46,7 @@ mpl.rcParams['font.size'] = 16
 
 # %% LOAD DATA
 
-# Open pkl files with hexagonal coordinates
+# Open pkl files with hexagonal coordinates. These are the output of Fig0_Regrid_to_Hexgrid.py!
 # PIKART
 d_ars_pikart = pd.read_pickle(INPUT_PATH + 'PIKART_hex.pkl')
 d_ars_pikart['time'] = pd.to_datetime(d_ars_pikart['time'])
@@ -51,10 +56,11 @@ d_ars_target = pd.read_pickle(INPUT_PATH + 'target_hex.pkl')
 d_ars_target['time'] = pd.to_datetime(d_ars_target['time'])
 
 
-# %% REAL CATALOG
+# %% Load catalogs and graphs
 
 """
-Figure 2: random networks/null models of varying complexity.
+Figure 1: random networks/null models of varying complexity.
+The ensemble generated here is used across the different network measures in the paper.
 """
 
 ## Network parameters
@@ -92,13 +98,9 @@ Gcons = artn.consensus_network([Gpikart, Gtarget], thresh, eps)
 
 # %% RANDOM NETWORKS
 
-# ETA
-##(200*100*2)/3600 + (19*100*2)/3600 + (19*100*2)/3600 + (4*100*2)/3600
-## 27h for two hundred realizations
-
 # Number of realizations
-Nrealiz = 2
-maxdist = 3
+Nrealiz = 2 # increase to sufficient ensemble size (but plan some waiting time...)
+maxdist = 3 # maximum distance parameter for the randomly rewired graph
 
 # Blank network: generate a fully connected network with real nodes and edge weights = 1
 Gblank = model.build_hex_graph(res, dem=None, elevation_scaling=0.001)
@@ -133,21 +135,6 @@ l_Gwalk_term_cons = [artn.consensus_network([l_Gwalk_term_pikart[n], l_Gwalk_ter
 l_Grewired_pikart = model.rewire_edges(Gpikart, Nrealiz, maxdist)
 l_Grewired_target = model.rewire_edges(Gtarget, Nrealiz, maxdist)
 l_Grewired_cons = model.rewire_edges(Gcons, Nrealiz, maxdist)
-
-
-import numpy as np
-
-len(list(nx.get_node_attributes(l_Gwalk_rndm_pikart[0], "coordID").values()))
-len(np.unique(list(nx.get_node_attributes(l_Gwalk_rndm_pikart[0], "coordID").values())))
-
-
-
-
-
-plot.plot_network(l_Grewired_cons[0], widths='weights', colours='weights', layout='default', ndec=ndec, log=False,
-                  arrowsize=0, linewidth=4, curvature=0.4, fontsize=14, ncolors=20, discard=180,
-                  alpha=.5, show_nodes=True, proj = ccrs.EqualEarth(),
-                  show_axes=False)
 
 
 # %% SAVE

@@ -1,17 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
 #------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-INDICES_PATH = '/Users/tbraun/Desktop/data/Global_Climate_Indices/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
 
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 
 # %% IMPORT MODULES
@@ -21,7 +24,6 @@ import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 import pandas as pd
 import matplotlib as mpl
-#mpl.use('Agg')
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import Normalize, LogNorm
@@ -35,15 +37,8 @@ from cmcrameri import cm
 import cartopy.feature as cfeature
 from tqdm import tqdm
 import cartopy.crs as ccrs
-import geopandas as gpd
-from collections import defaultdict
-import random
-import itertools
-import h3 as h3
-from sklearn.metrics import mean_squared_error
 
-
-# my packages
+# local subroutines
 import ARnet_sub as artn
 import NETanalysis_sub as ana
 import NETplots_sub as nplot
@@ -87,7 +82,7 @@ d_ars_target_nohex = pd.read_pickle(INPUT_PATH + 'tARget_globalARcatalog_ERA5_19
 d_ars_target['lf_lon'] = d_ars_target_nohex['lf_lon']
 
 # ENSO
-d_enso = pd.read_csv(INDICES_PATH + 'ONI.txt', delim_whitespace=True, header=None, dtype=str, skiprows=1, engine='python')
+d_enso = pd.read_csv(INPUT_PATH + 'ONI.txt', delim_whitespace=True, header=None, dtype=str, skiprows=1, engine='python')
 d_enso = d_enso[d_enso.apply(lambda row: not row.str.contains('-99.90').any(), axis=1)]
 
 
@@ -129,55 +124,6 @@ d_oscidx = d_oscidx_long.copy()
 
 
 
-# %% PARAMETERS
-
-# Merge with ARcat DataFrame based on time
-ARcat = d_ars_pikart.copy()
-# Resample to daily res
-d_oscidx_daily = d_oscidx['teleconnection'].resample('D').ffill()
-# Merge
-ARcat['time'] = pd.to_datetime(ARcat['time']).dt.floor('D')
-ARcat = ARcat.merge(d_oscidx_daily.rename('teleconnection'), left_on='time', right_index=True, how='left')
-
-
-# SANITY CHECK
-%matplotlib inline
-# Plot the original and 3-month average ONI time series
-plt.figure(figsize=(12, 6))
-plt.plot(d_oscidx_long.index, d_oscidx_long['COidx'], label='Original', color='gray', alpha=0.5)
-secx = plt.twinx()
-secx.plot(d_oscidx_long.index, d_oscidx_long['COidx_3month_avg'], label='3-Month Avg', color='black', linewidth=2)
-
-# Overlay classified points from `d_oscidx_long`
-el_nino = d_oscidx_long[d_oscidx_long['teleconnection'] == 1]
-la_nina = d_oscidx_long[d_oscidx_long['teleconnection'] == -1]
-neutral = d_oscidx_long[d_oscidx_long['teleconnection'] == 0]
-
-secx.scatter(el_nino.index, el_nino['COidx_3month_avg'], color='red', label='El Niño (Original)', marker='o', s=30)
-secx.scatter(la_nina.index, la_nina['COidx_3month_avg'], color='blue', label='La Niña (Original)', marker='o', s=30)
-secx.scatter(neutral.index, neutral['COidx_3month_avg'], color='goldenrod', label='Neutral (Original)', marker='o', s=30)
-
-# Overlay classified points from `ARcat`'s `teleconnection` column for comparison
-el_nino_merged = ARcat[ARcat['teleconnection'] == 1]
-la_nina_merged = ARcat[ARcat['teleconnection'] == -1]
-neutral_merged = ARcat[ARcat['teleconnection'] == 0]
-
-# Adjust y-position for markers from `ARcat` to avoid overlap with ONI values
-secx.scatter(el_nino_merged['time'], [0.25]*len(el_nino_merged), color='red', label='El Niño (Merged)', marker='x', s=50)
-secx.scatter(la_nina_merged['time'], [0.25]*len(la_nina_merged), color='blue', label='La Niña (Merged)', marker='x', s=50)
-secx.scatter(neutral_merged['time'], [0.25]*len(neutral_merged), color='goldenrod', label='Neutral (Merged)', marker='x', s=50)
-
-# Add labels and legend
-plt.xlabel('Date')
-plt.ylabel('Index Value')
-secx.set_ylabel('Teleconnection Classification')
-
-# Combine legends from both plots
-plt.legend(loc="upper left")
-secx.legend(loc="upper right")
-plt.show()
-
-
 # %% CONDITIONAL AR NETWORKS
 
 """
@@ -188,6 +134,7 @@ ENSO order: La Nina, neutral, El Nino
 # PICK THE INDEX
 cond = 'season'
 
+# Thresholds are lower than for the full time-span ARTN
 if cond == 'teleconnection':
     l_eps = np.array([3, 9, 3])
 elif cond == 'season':
@@ -245,7 +192,7 @@ if cond == 'season':
     Gtarget, t_idx_target, t_hexidx_target, t_ivt_target = [Gtarget[ns1], Gtarget[ns2]], [t_idx_target[ns1], t_idx_target[ns2]], [t_hexidx_target[ns1], t_hexidx_target[ns2]], [t_ivt_target[ns1], t_ivt_target[ns2]]
 Lp = len(Gtarget)
 
-# Check: did we set the thresholds right?
+# Check: did we set the thresholds about right?
 print(Gpikart[0].number_of_edges())
 print(Gpikart[1].number_of_edges())
 print(Gpikart[2].number_of_edges())
@@ -318,7 +265,6 @@ for n in tqdm(range(Lp)):
 
 # %% EDGE BETWEENNESS: EBC CONSENSUS
 
-
 # LOOP OVER REGIMES
 l_Gbetw_phases = []
 for nph in tqdm(range(Lp)):
@@ -332,11 +278,6 @@ for nph in tqdm(range(Lp)):
         nx.set_edge_attributes(G, d_ebetw, "edge_betweenness")
         l_Gbetw_cat.append(G)
     l_Gbetw_phases.append(l_Gbetw_cat)
-
-# EDGE BETWEENNESS CONSENSUS (basically averaging)
-#l_Gcons = [artn.consensus_network([l_Gbetw_phases[nph][0], l_Gbetw_phases[nph][1]], 0, 0, weight_variable='edge_betweenness') for nph in range(Lp)]
-## define network for neutral state
-#Gneutr = l_Gcons[0].copy()
 
 # Averaging of edge betweenness, edge weights and IVT classes:
 l_Gcons0 = [artn.average_networks_by_attributes(l_Gbetw_phases[nph][0], l_Gbetw_phases[nph][1], attr_name="edge_betweenness") for nph in range(Lp)]
@@ -379,7 +320,6 @@ l_colmaps = [plt.get_cmap('Purples'), plt.get_cmap('Greens')]
 l_alphas = [.75, .5]
 
 # FIGURE
-%matplotlib 
 fig, ax = plt.subplots(subplot_kw={'projection': proj}, figsize=(10, 10))
 ax.set_global()
 ax.coastlines(color='black', linewidth=0.5)
@@ -457,8 +397,11 @@ plt.savefig(OUTPUT_PATH + "Fig4d_cbar.png", dpi=500, bbox_inches='tight')
 
 # %% PANEL E&F/H&I - PHASE 1 & 2
 
-# Pick phase of oscillation & average IVTdiffs per edge for consensus
-nph = 1
+# Pick phase of oscillation 
+nph = 1 #  MODIFY
+
+
+# ...average IVTdiffs per edge for consensus
 l_Gcons0 = [artn.average_networks_by_attributes(l_Gbetw_phases[nph][0], l_Gbetw_phases[nph][1], attr_name="IVTdiff") for nph in range(Lp)]
 l_Gcons = [artn.complete_nodes(l_Gcons0[nph], res) for nph in range(Lp)]
 Gplot = l_Gcons[nph].copy()
@@ -480,7 +423,6 @@ norm = Normalize(vmin=-3, vmax=3)#
 
 
 # FIGURE
-%matplotlib 
 fig, ax = plt.subplots(subplot_kw={'projection': proj}, figsize=(10, 10))
 ax.set_global()
 ax.coastlines(color='black', linewidth=0.5)

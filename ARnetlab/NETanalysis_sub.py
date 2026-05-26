@@ -1,12 +1,5 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
-
-#------------------ PATH ---------------------------#
-# working directory
-import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-
 
 # %% IMPORT MODULES
 
@@ -17,18 +10,14 @@ import pandas as pd
 import warnings
 from pandas.errors import SettingWithCopyWarning
 warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
+from scipy.stats import pearsonr
+from sklearn.linear_model import HuberRegressor
 
 # specific packages
 from itertools import combinations
 from tqdm import tqdm
 import networkx as nx
 from infomap import Infomap
-
-
-# %% INTERNAL HELPER FUNCTIONS
-# The functions below are not meant to be called from a script but are secondary
-# functions that are called by the main functions below.
-
 
 
 # %% NODE-BASED MEASURES
@@ -220,6 +209,135 @@ def compute_node_moisture_transport(indices, ivt, output='quantile', quantiles=N
 
 
 
+def compute_track_scores(df, G,
+                         hex_col='hex_idx_centroid_res2',
+                         attr='IVTdiff',
+                         min_length=4,
+                         use_landfall=True):
+    """
+    Compute per-track summary scores from node attributes along each AR trajectory,
+    truncated at first landfall.
+
+    For every track in `df`, the function walks the sequence of hexagon cells the
+    AR occupies (sorted in time), looks up the node attribute `attr` on graph `G`
+    for each cell, and aggregates these values into sum and mean scores. Tracks
+    are truncated at their first landfall and discarded if they are too short or
+    have too few valid attribute values.
+
+    Args:
+    df (pandas.DataFrame): AR catalog with one row per track timestep. Must
+        contain the columns 'trackid', 'time', 'lf_lon', 'mean_ivt', and the
+        hex-index column specified by `hex_col`.
+    G (networkx.DiGraph): Graph whose nodes are hexagon cells carrying the
+        attribute `attr` (e.g. an IVTdiff sign class).
+    hex_col (str): Name of the column in `df` holding the hexagon index for
+        each timestep. Defaults to 'hex_idx_centroid_res2'.
+    attr (str): Node attribute on `G` to read along the trajectory. Defaults
+        to 'IVTdiff'.
+    min_length (int): Minimum number of pre-landfall timesteps (and minimum
+        number of valid attribute values) required to keep a track. Defaults
+        to 4.
+    use_landfall (bool): If True, truncate each track at its first landfall
+        and skip tracks without a landfall. If False, all tracks are skipped
+        (no scores are computed). Defaults to True.
+
+    Returns:
+    pandas.DataFrame: One row per retained track with columns:
+        - 'trackid': track identifier
+        - 'sum_score': sum of valid node attribute values along the track
+        - 'mean_score': mean of valid node attribute values along the track
+        - 'ref_ivt': reference IVT at first landfall (falls back to the last
+          timestep's 'mean_ivt' if no landfall row is available)
+        - 'pre_lf_length': number of timesteps up to and including landfall
+    """
+    results = []
+    for tid, group in tqdm(df.groupby('trackid')):
+        group = group.sort_values('time')
+
+        # truncate at first landfall
+        if not use_landfall or group['lf_lon'].first_valid_index() is None:
+            continue
+        lf_idx = group['lf_lon'].first_valid_index()
+        if lf_idx <= min_length - 1:
+            continue
+        group = group.loc[:lf_idx]
+
+        hex_path = group[hex_col].values
+        scores = [G.nodes[n].get(attr, np.nan) for n in hex_path if G.has_node(n)]
+        scores = np.array(scores, dtype=float)
+        valid = scores[~np.isnan(scores)]
+        if len(valid) < min_length:
+            continue
+
+        ref_row = group.dropna(subset=['lf_lon']).head(1)
+        ref_ivt = ref_row['mean_ivt'].values[0] if not ref_row.empty else group['mean_ivt'].iloc[-1]
+
+        results.append({
+            'trackid': tid,
+            'sum_score': np.nansum(valid),
+            'mean_score': np.nanmean(valid),
+            'ref_ivt': ref_ivt,
+            'pre_lf_length': len(group),
+        })
+    return pd.DataFrame(results)
+
+
+def compute_predictability(df, summary_df, epsilon=1.35):
+    """
+    Estimate per-track predictability of landfall IVT from trajectory mean scores.
+
+    Predictability is defined in a somewhat loose regression sense here...
+    If fits a robust Huber regression of `ref_ivt` on `mean_score` across all
+    tracks in `summary_df`, computes absolute residuals in IVT space, and
+    defines a per-track predictability score as the system-level Pearson R^2
+    attenuated by the residual size (normalised by the median residual).
+    Predictability is therefore bounded above by the system-level R^2 and
+    decays as a track's prediction error grows. Landfall coordinates are then
+    pulled from `df` and paired with each track's IVT and predictability.
+
+    Args:
+    df (pandas.DataFrame): AR catalog with one row per track timestep, used
+        to look up landfall coordinates. Must contain 'trackid', 'lf_lon',
+        and 'lf_lat'.
+    summary_df (pandas.DataFrame): Output of `compute_track_scores`, with
+        columns 'trackid', 'mean_score', and 'ref_ivt'.
+    epsilon (float): Robustness parameter of `sklearn.linear_model.HuberRegressor`;
+        smaller values downweight outliers more aggressively. Defaults to 1.35.
+
+    Returns:
+    pandas.DataFrame: One row per retained landfall with columns:
+        - 'lon': landfall longitude
+        - 'lat': landfall latitude
+        - 'ivt': reference IVT at landfall
+        - 'pred': predictability score in [0, R^2]
+    """
+    x = summary_df[['mean_score']].values
+    y = summary_df['ref_ivt'].values
+
+    model = HuberRegressor(epsilon=epsilon).fit(x, y)
+    y_pred = model.predict(x)
+    res = np.abs(y - y_pred)
+
+    r, _ = pearsonr(x.flatten(), y)
+    R2 = max(r, 0)
+    R_system = np.median(res) + 1e-12
+    predictability = R2 / (res / R_system + 1)
+
+    landfalls = []
+    tids = summary_df['trackid'].values
+    for tid, group in tqdm(df.groupby('trackid')):
+        lf_row = group.dropna(subset=['lf_lon']).head(1)
+        if lf_row.empty or tid not in tids:
+            continue
+        lon = lf_row['lf_lon'].iloc[0]
+        lat = lf_row['lf_lat'].iloc[0]
+        ivt = summary_df.loc[summary_df['trackid'] == tid, 'ref_ivt'].values[0]
+        pred = predictability[np.where(tids == tid)][0]
+        landfalls.append((lon, lat, ivt, pred))
+
+    return pd.DataFrame(landfalls, columns=['lon', 'lat', 'ivt', 'pred'])
+
+
 # %% EDGE-BASED MEASURES
 
 
@@ -312,6 +430,100 @@ def compute_edge_moisture_transport(indices, ivt, output, quantiles=None, thresh
         sign_dict[key] = edge_class
 
     return sign_dict
+
+
+
+def highway_stats(
+    observed_paths, G, 
+    ebc_attr='edge_betweenness',
+    threshold_quantile=0.9,
+    min_length=4
+):
+    """
+    Compute statistics of AR trajectories relative to high-betweenness 'highway' edges:
+    (1) fraction of trajectories with at least n highway segments,
+    (2) fraction of trajectories with at least n consecutive highway segments.
+
+    Parameters
+    ----------
+    observed_paths : list of lists/arrays
+        Each trajectory as a sequence of node IDs.
+    G : networkx.Graph or DiGraph
+        Graph with edge betweenness stored as an attribute.
+    ebc_attr : str
+        Name of edge betweenness attribute.
+    threshold_quantile : float
+        Quantile threshold to define 'highway' edges (top X%).
+    min_length : int
+        Minimum trajectory length (number of nodes) to include.
+
+    Returns
+    -------
+    n_segments : np.ndarray
+        Number of highway segments.
+    frac_segments : np.ndarray
+        Fraction of trajectories with at least that many highway segments.
+    n_seq : np.ndarray
+        Sequence length of consecutive highway segments.
+    frac_seq : np.ndarray
+        Fraction of trajectories with at least that many consecutive highway segments.
+    """
+    # 1. Determine highway edge threshold
+    all_ebc = np.array([edata[ebc_attr] for _, _, edata in G.edges(data=True) if ebc_attr in edata])
+    if all_ebc.size == 0:
+        raise ValueError(f"Graph edges must have '{ebc_attr}' attribute.")
+    highway_thresh = np.quantile(all_ebc, threshold_quantile)
+
+    counts = []
+    max_run_lengths = []
+    n_traj = 0
+
+    for path in tqdm(observed_paths):
+        path = path.tolist() if isinstance(path, np.ndarray) else path
+        # remove consecutive duplicates
+        filtered_path = [path[0]]
+        for u, v in zip(path[:-1], path[1:]):
+            if u != v:
+                filtered_path.append(v)
+
+        if len(filtered_path) < min_length:
+            continue
+
+        n_traj += 1
+        highway_count = 0
+        run_length = 0
+        max_run = 0
+
+        for u, v in zip(filtered_path[:-1], filtered_path[1:]):
+            try:
+                ebc = G[u][v][ebc_attr]
+                if ebc >= highway_thresh:
+                    highway_count += 1
+                    run_length += 1
+                    max_run = max(max_run, run_length)
+                else:
+                    run_length = 0
+            except KeyError:
+                run_length = 0
+
+        counts.append(highway_count)
+        max_run_lengths.append(max_run)
+
+    if n_traj == 0:
+        return np.array([]), np.array([]), np.array([]), np.array([])
+
+    # segment stats
+    counts = np.array(counts)
+    max_count = np.max(counts)
+    n_segments = np.arange(1, max_count + 1)
+    frac_segments = np.array([(counts >= n).sum() / len(counts) for n in n_segments])
+
+    # sequence stats
+    max_seq_len = max(max_run_lengths) if max_run_lengths else 0
+    n_seq = np.arange(1, max_seq_len + 1)
+    frac_seq = np.array([sum(run >= N for run in max_run_lengths) / n_traj for N in n_seq])
+
+    return n_segments, frac_segments, n_seq, frac_seq
 
 
 

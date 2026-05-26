@@ -1,11 +1,5 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
-
-#------------------ PATH ---------------------------#
-import sys
-PATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/scripts"
-sys.path.insert(0, PATH)
-
 
 # %% IMPORT MODULES
 
@@ -29,8 +23,6 @@ from shapely.geometry import shape, Polygon, box
 # %% INTERNAL HELPER FUNCTIONS
 # The functions below are not meant to be called from a script but are secondary
 # functions that are called by the main functions below.
-
-
 
 def _get_edge_directions(G, ncolors=40):
     """

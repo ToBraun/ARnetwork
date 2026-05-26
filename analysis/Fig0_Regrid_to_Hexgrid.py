@@ -1,16 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
-#------------------ PATHS ---------------------------#
+#------------------ PATH ---------------------------#
+# working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
-MERRAPATH = "/Users/tbraun/Desktop/projects/#A_PIKART_PIK/production_files/data/MERRA2/PIKARTV1_lagrangian/"
+from pathlib import Path
+import os
 
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
 
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 # %% IMPORT MODULES
 
@@ -23,7 +27,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 from h3 import h3
 
-# my packages
+# local subroutines
 import ARnet_sub as artn
 
 
@@ -41,13 +45,16 @@ mpl.rcParams['font.size'] = 16
 
 # %% LOAD DATA
 
-# PIKART-1
-#d_ars_pikart = pd.read_csv(INPUT_PATH + 'CATALOG_1940-2023_PIKARTV1_Vallejo-Bernal_Braun_etal_2025_ERA5_full.csv')
-#d_ars_pikart['time'] = pd.to_datetime(d_ars_pikart['time'])
+# For PIKART, we gotta choose ERA5 or MERRA2 here.
+DATASET = "ERA5"
 
-# PIKART-1 MERRA2
-d_ars_pikart = pd.read_csv(MERRAPATH + '1980-2019_PIKARTV1_Vallejo-Bernal_Braun_etal_2025_MERRA2.csv')
-d_ars_pikart['time'] = pd.to_datetime(d_ars_pikart['time'])
+# PIKART-1
+if DATASET == "ERA5":
+    d_ars_pikart = pd.read_csv(INPUT_PATH + 'CATALOG_1940-2023_PIKARTV1_Vallejo-Bernal_Braun_etal_2025_ERA5_full.csv')
+    d_ars_pikart['time'] = pd.to_datetime(d_ars_pikart['time'])
+elif DATASET == "MERRA2":
+    d_ars_pikart = pd.read_csv(INPUT_PATH + '1980-2019_PIKARTV1_Vallejo-Bernal_Braun_etal_2025_MERRA2.csv')
+    d_ars_pikart['time'] = pd.to_datetime(d_ars_pikart['time'])
 
 # tARget-4
 d_ars_target = pd.read_pickle(INPUT_PATH + 'tARget_globalARcatalog_ERA5_1940-2023_v4.0_converted.pkl')
@@ -57,28 +64,26 @@ d_ars_target['time'] = pd.to_datetime(d_ars_target['time'])
 
 # %% REGRIDDING
 
+# Regridding to a hexagonal grid using h3 at several resolutions ((lat,lon)->hex_idx->(hex_x, hex_y))
 ## NOTE: tARget's longitudes range between 0 and 360!
-# But h3 is smart enough to automatically transform them correctly.
+## But h3 is smart enough to automatically transform them correctly.
 
 # PARAMETERS
 catalog = 'pikart'
 
-
-# Initialize
+# AR locators that will be regridded
 if catalog == 'pikart':
     ARcat = d_ars_pikart.copy()
     l_arloc = ['centroid', 'head', 'core']
 elif catalog == 'target':
     ARcat = d_ars_target.copy()
     l_arloc = ['centroid', 'head']
-# AR locators that will be regridded
 
-l_arloc = ['centroid']
 
 Nloc = len(l_arloc)
-Nres = 3
+Nres = 3 # how many resolutions do we want?
 
-# Drop contours, axes, and all columns starting with 'insu_' or 'conti_'
+# Drop contours, axes, and all columns starting with 'insu_' or 'conti_' (not needed for entworks anyway)
 ARcat = ARcat.drop(columns=[col for col in ARcat.columns 
                       if col in ['contour_lon', 'contour_lat', 'axis_lon', 'axis_lat'] 
                       or col.startswith('insu_') 
@@ -109,7 +114,7 @@ for nloc in tqdm(range(Nloc)):
 
 # %% SAVE
 
-# sanity check
+# sanity check - new columns exist?
 print(ARcat.columns)
 
 # Write out
