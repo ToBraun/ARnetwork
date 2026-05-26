@@ -5,10 +5,10 @@
 
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
+WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/Nature/scripts/ARnetlab"
 sys.path.insert(0, WDPATH)
 # input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
+INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/Nature/data/'
 OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/suppl_figures/'
 
 
@@ -141,7 +141,7 @@ observed_paths_target = [l_artracks_target[i].coord_idx.values for i in range(le
 l_alltracks = observed_paths_pik.copy() # select catalog
 Nsmpl = 20
 Lmin = 4 # minimum track length
-SEEED = 123#123
+SEEED = 123
 l_cols = ["#003b76", "#ffab2f", "#ec48fa", "#6b9700", "#ac79ff", "#c89900", "#76006f",
           "#01864e", "#f80034", "#84b1ff", "#ff8f42", "#005757", "#de0053", "#eeb8c4",
           "#4b1303", "#fcade4", "#450f3c", "#ffa86d", "#910057", "#8b5f58"]

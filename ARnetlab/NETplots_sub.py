@@ -534,7 +534,6 @@ def plot_network(G, widths, colours, layout, ndec, log=False, arrowsize=10, line
         tick_positions = np.array([0.25, 0.5, 0.75, 1])
         tick_labels = np.array(['E', 'S', 'W', 'N'])
         cbar_label = 'edge direction'
-
     else:
         raise ValueError("Invalid colour attribute.")
 

@@ -43,13 +43,13 @@ params = {'xtick.direction': 'in',
 plt.rcParams.update(params)
 mpl.rcParams['axes.linewidth'] = 1.5
 mpl.rcParams['font.size'] = 16
-fs = 20
+fs = 22
 
 %matplotlib
 
 # %% FUNCTIONS
 def divide_by_ndec(x, pos):
-    return f'{int(x / nyear)}'
+    return f'{int(x / (nyear/10))}'
 
 
 # %% LOAD DATA
@@ -63,7 +63,7 @@ dem = dem_ds['dem'].isel(time=0)
 # Choose if multiple testing correciton should be applied
 significance_mode = 'corrected'  # or 'raw'
 # Choose panel
-PANEL = 'a'
+PANEL = 'c'
 # Confidence level
 alpha = 0.1#05
 # number of years
@@ -75,8 +75,6 @@ nyear = 83
 if PANEL == 'a':    
     # LOAD data
     d_nodestr = gpd.read_file(INPUT_PATH + "nodestr_centroid_consensus.gpkg", layer='nodestr')
-
-
 
     # Colormaps
     cmap0, cmap1, cmap2, cmap3, cmap4 = cm.grayC_r, cm.devon_r, CMAP.Purples, CMAP.Oranges, cm.imola#CMAP.Greens
@@ -145,7 +143,7 @@ if PANEL == 'a':
                    transform=ccrs.PlateCarree(), norm=norm, edgecolor='black', linewidth=.8, legend=False)
     
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3a.png', dpi=600, bbox_inches='tight', transparent=True)
+    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2a.png', dpi=600, bbox_inches='tight')
 #    plt.savefig(OUTPUT_PATH + '/Fig3a.png', dpi=300, bbox_inches='tight')
 #    plt.savefig(SUPP_PATH + '/Fig3S2a.png', dpi=300, bbox_inches='tight')
 
@@ -158,28 +156,28 @@ if PANEL == 'a':
     # Create and format each colorbar
     cbars = []
     cmaps = [cmap0, cmap1, cmap2, cmap3, cmap4]
-    cbar_labels = ['no test passed', 'FRW', 'FRW+GCW', 'FRW+GCW+TCW', 'all tests passed']
+    cbar_labels = ['no test passed', 'FRW', 'FRW+GCW', 'FRW+GCW+TCW', 'all tests']
     k=0
     for ax, cmap in zip(cbar_axs, cmaps):
         cbar = plt.colorbar(
             plt.cm.ScalarMappable(cmap=cmap, norm=norm),
             cax=ax,
             orientation='horizontal',
-            format=formatter,
-            ticks=np.array([0, 5*nyear,10*nyear,15*nyear], dtype=int)
-        )
+            format=formatter)#,
+            #ticks=np.array([0, 5*nyear,10*nyear,15*nyear], dtype=int)
+        #)
         cbar.ax.tick_params(labelsize=fs)
         cbar.set_label(cbar_labels[k], color='black', fontsize=fs)
         cbars.append(cbar)
         k+=1
     
     # Add a single, centered label below all colorbars
-    cbar_fig.text(0.5, -1.4, 'node strength (ARs/year)', ha='center', va='center', fontsize=fs, color='black')
+    cbar_fig.text(0.5, -1.4, 'node strength (ARs/decade)', ha='center', va='center', fontsize=fs, color='black')
     
     # Adjust layout to fit everything nicely
     plt.subplots_adjust(wspace=0.1, bottom=0.4)
     plt.show()
-    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3a_cbar.png', dpi=600, bbox_inches='tight', transparent=True)
+    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2a_cbar.png', dpi=600, bbox_inches='tight')
 #    plt.savefig(OUTPUT_PATH + '/Fig3a_cbar.png', dpi=300, bbox_inches='tight')
 #    plt.savefig(SUPP_PATH + '/Fig3S2a_cbar.png', dpi=300, bbox_inches='tight')
 
@@ -189,7 +187,7 @@ if PANEL == 'a':
 elif PANEL == 'b':
     
     # LOAD data
-    d_ndiv = gpd.read_file(INPUT_PATH + "divergence_centroid_consensus.gpkg", layer='ndiv')
+    d_ndiv = gpd.read_file(INPUT_PATH + "divergence_head_consensus.gpkg", layer='ndiv')
 
 
     # --- POST-PROCESSING ---
@@ -245,8 +243,8 @@ elif PANEL == 'b':
         pop4.plot(column='ndiv', cmap=cmap2, ax=ax,
                    transform=ccrs.PlateCarree(), norm=norm, edgecolor='black', linewidth=0.5, legend=False)
     plt.show()
-#    plt.savefig(OUTPUT_PATH + '/Fig3b.png', dpi=300, bbox_inches='tight')
-    plt.savefig(SUPP_PATH + '/Fig3S2b.png', dpi=300, bbox_inches='tight')
+    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2d.png', dpi=600, bbox_inches='tight')
+#    plt.savefig(SUPP_PATH + '/Fig3S2c.png', dpi=300, bbox_inches='tight')
 
 
 
@@ -273,12 +271,12 @@ elif PANEL == 'b':
         k+=1
     
     # Add a single, centered label below all colorbars
-    cbar_fig.text(0.5, -1.2, 'node divergence (ARs/year)', ha='center', va='center', fontsize=fs, color='black')
+    cbar_fig.text(0.5, -1.2, 'node divergence (ARs/decade)', ha='center', va='center', fontsize=fs, color='black')
     
     # Adjust layout to fit everything nicely
     plt.subplots_adjust(wspace=0.1, bottom=0.4)
     plt.show()
-    plt.savefig(OUTPUT_PATH + '/Fig3b_cbar.png', dpi=300, bbox_inches='tight')
+    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2d_cbar.png', dpi=600, bbox_inches='tight')
 #    plt.savefig(SUPP_PATH + '/Fig3S2b_cbar.png', dpi=300, bbox_inches='tight')
 
 
@@ -296,7 +294,7 @@ elif PANEL == 'c':
     """
     
     # LOAD data
-    d_pagernk = gpd.read_file(INPUT_PATH + "pagerank_head_consensus.gpkg", layer='pagernk')
+    d_pagernk = gpd.read_file(INPUT_PATH + "pagerank_head_consensus.gpkg")
     
     
     
@@ -347,7 +345,6 @@ elif PANEL == 'c':
     pop4 = pop4.set_geometry('geometry')
 
     
-    
     # F I G U R E 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.EqualEarth()})
     ax.set_global()
@@ -382,7 +379,10 @@ elif PANEL == 'c':
                    transform=ccrs.PlateCarree(), norm=norm, edgecolor='black', linewidth=.8, legend=False, alpha=.9)
     
     plt.show()
-    plt.savefig(OUTPUT_PATH + '/Fig3c.png', dpi=300, bbox_inches='tight')
+    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2f.png', dpi=600, bbox_inches='tight')
+#    plt.savefig(OUTPUT_PATH + '/Fig3c.png', dpi=300, bbox_inches='tight')
+
+
 
     
     # SEPARATE COLORBAR PLOT
@@ -391,7 +391,7 @@ elif PANEL == 'c':
     # Create and format each colorbar
     cbars = []
     cmaps = [cmap0, cmap1, cmap2, cmap3, cmap4]
-    cbar_labels = ['no test passed', 'FRW', 'FRW+GCW', 'FRW+GCW+TCW', 'all tests passed']
+    cbar_labels = ['no test passed', 'FRW', 'FRW+GCW', 'FRW+GCW+TCW', 'all tests']
     k=0
     for ax, cmap in zip(cbar_axs, cmaps):
         cbar = plt.colorbar(
@@ -410,6 +410,6 @@ elif PANEL == 'c':
     # Adjust layout to fit everything nicely
     plt.subplots_adjust(wspace=0.1, bottom=0.4)
     plt.show()
-    plt.savefig(OUTPUT_PATH + '/Fig3c_cbar.png', dpi=300, bbox_inches='tight')
+    plt.savefig('/Users/tbraun/Desktop/' + '/Fig3S2f_cbar.png', dpi=600, bbox_inches='tight')
 #    plt.savefig(SUPP_PATH + '/Fig3S2a_cbar.png', dpi=300, bbox_inches='tight')
 

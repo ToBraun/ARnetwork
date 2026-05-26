@@ -5,10 +5,10 @@
 
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
+WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/Nature/scripts/ARnetlab"
 sys.path.insert(0, WDPATH)
 # input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/'
+INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/Nature/data/'
 OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
 
 

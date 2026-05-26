@@ -233,12 +233,13 @@ print('Conformists: ' + str(len(l_conform_indices_target)/np.sum(a_ltime_target*
 print('Straddlers: ' + str(len(l_strad_indices_target)/np.sum(a_ltime_target*4 > Lmin)))
 
 
-# %% SCATTER PLOT
+
+# %% BOXPLOTs
 
 
 
 # CHOOSE VARIABLE
-VAR = 'ivt'  # or 'ltime'
+VAR = 'ltime'  # or 'ltime'
 
 # === CLASS-VARIABLE EXTRACTION ===
 
@@ -292,7 +293,7 @@ bg_data['group'] = pd.Categorical(bg_data['group'], categories=group_order, orde
 
 
 # === VIOLIN PLOT ===
-plt.figure(figsize=(6, 5))
+plt.figure(figsize=(8, 3))
 mpl.rcParams['font.size'] = 16
 
 # Remove non-positive values if VAR is 'ltime'
@@ -338,10 +339,13 @@ if VAR == 'ltime':
     custom_ticks = [1, 2, 3, 7, 14, 21]
     ax.set_yticks(custom_ticks)
     ax.set_yticklabels([f"{d}d" for d in custom_ticks])
-    
+
+#ax.set_xticks([])
 plt.tight_layout()
 plt.show()
-plt.savefig(OUTPUT_PATH + "Fig4S6d.png", dpi=500, bbox_inches='tight')
+plt.savefig("/Users/tbraun/Desktop/" + "lt_vio.png", dpi=500, bbox_inches='tight', transparent=True)
+#plt.savefig(OUTPUT_PATH + "Fig4S6d.png", dpi=500, bbox_inches='tight')
+
 
 
 

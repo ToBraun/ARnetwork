@@ -1,15 +1,20 @@
-# Copyright (C) 2025 by
+# Copyright (C) 2026 by
 # Tobias Braun
 
-#------------------ PATHS ---------------------------#
-
+#------------------ PATH ---------------------------#
 # working directory
 import sys
-WDPATH = "/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/scripts/ARnetlab"
-sys.path.insert(0, WDPATH)
-# input and output
-INPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/data/random_graphs/'
-OUTPUT_PATH = '/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/paper/figures/'
+from pathlib import Path
+import os
+
+# Set root directory
+REPO_ROOT = Path.cwd()
+# Insert path to be able to find subroutines
+sys.path.insert(0, str(REPO_ROOT))
+
+# Set paths
+INPUT_PATH  = Path(os.environ.get("ARNET_DATA",   REPO_ROOT / "data"))
+OUTPUT_PATH = Path(os.environ.get("ARNET_FIGURES", REPO_ROOT / "figures"))
 
 
 # %% IMPORT MODULES
@@ -22,7 +27,7 @@ from matplotlib import pyplot as plt
 import networkx as nx
 import cartopy.crs as ccrs
 
-# my packages
+# local subroutines
 import NETplots_sub as nplot
 
 # %% PLOT PARAMETERS
@@ -36,9 +41,6 @@ params = {'xtick.direction': 'in',
 plt.rcParams.update(params)
 mpl.rcParams['axes.linewidth'] = 1.5
 mpl.rcParams['font.size'] = 18
-
-%matplotlib 
-
 
 # %% LOAD DATA
 

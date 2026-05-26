@@ -39,6 +39,8 @@ import random
 import itertools
 import h3 as h3
 from sklearn.metrics import mean_squared_error 
+from sklearn.linear_model import LinearRegression
+from scipy.stats import rankdata, spearmanr
 
 # my packages
 import ARnet_sub as artn
@@ -67,8 +69,10 @@ d_ars_pikart = pd.read_pickle(INPUT_PATH + 'PIKART' + '_hex.pkl')
 d_ars_target = pd.read_pickle(INPUT_PATH + 'target' + '_hex.pkl')
 
 # we also import the untransformed one as it contains the lf_lons needed here (only)
-d_ars_target_nohex = pd.read_pickle(INPUT_PATH + 'tARget_globalARcatalog_ERA5_1940-2023_v4.0_converted.pkl')
+d_ars_target_nohex = pd.read_pickle('/Users/tbraun/Desktop/projects/#B_ARTN_LPZ/data/' + 'tARget_globalARcatalog_ERA5_1940-2023_v4.0_converted_lf.pkl')
 d_ars_target['lf_lon'] = d_ars_target_nohex['lf_lon']
+d_ars_target['lf_lat'] = d_ars_target_nohex['lf_lat']
+
 
 
 # %% AR NETWORK
@@ -169,6 +173,347 @@ tmp_nodesigns2 = ana.compute_node_moisture_transport(t_hexidx_target[0],
                                                     output = 'manual',
                                                     thresholds = a_IVTthresholds)
 Gsigned_target = artn.add_node_attr_to_graph(G_esigned_target, tmp_nodesigns2, attr_name = 'IVTdiff')
+
+
+
+# %% PREDICTABILITY
+
+from scipy.stats import pearsonr
+#df = d_ars_pikart.copy()
+
+
+def compute_track_scores(df,
+                         G,
+                         hex_col='hex_idx_centroid_res2',
+                         attr='IVTdiff',
+                         min_length=4,
+                         use_landfall=True,
+                         mode='edge'):
+    """
+    Compute trajectory scores based on traversed edges or nodes,
+    truncated at first landfall.
+    
+    Returns:
+    - DataFrame with sum_score, mean_score, ref_ivt per track
+    """
+    results = []
+
+    for tid, group in tqdm(df.groupby('trackid')):
+        group = group.sort_values('time')
+
+        # --- truncate at first landfall ---
+        if use_landfall and group['lf_lon'].first_valid_index() is not None:
+            lf_idx = group['lf_lon'].first_valid_index()
+            if lf_idx > min_length-1:
+                group = group.loc[:lf_idx]  # keep rows until (and incl.) first landfall
+            else:
+                continue
+        else:
+            continue
+
+        hex_path = group[hex_col].values
+        scores = []
+
+        if mode == 'edge':
+            for u, v in zip(hex_path[:-1], hex_path[1:]):
+                if G.has_edge(u, v):
+                    val = G[u][v].get(attr, np.nan)
+                    scores.append(val)
+        elif mode == 'node':
+            for node in hex_path:
+                if G.has_node(node):
+                    val = G.nodes[node].get(attr, np.nan)
+                    scores.append(val)
+        else:
+            raise ValueError("Invalid mode: choose 'edge' or 'node'")
+
+        # --- apply min_length to pre-landfall section ---
+        scores = np.array(scores, dtype=float)
+        valid_scores = scores[~np.isnan(scores)]
+        if len(valid_scores) < min_length:
+            continue
+
+        sum_score = np.nansum(valid_scores)
+        mean_score = np.nanmean(valid_scores)
+
+        # --- reference IVT at landfall (if available) ---
+        ref_row = group.dropna(subset=['lf_lon']).head(1) if use_landfall else pd.DataFrame()
+        if not ref_row.empty:
+            ref_ivt = ref_row['mean_ivt'].values[0]
+        else:
+            ref_ivt = group['mean_ivt'].iloc[-1]
+
+        results.append({
+            'trackid': tid,
+            'sum_score': sum_score,
+            'mean_score': mean_score,
+            'ref_ivt': ref_ivt,
+            'pre_lf_length': len(group)  # store pre-landfall length for regression
+        })
+
+    return pd.DataFrame(results)
+
+
+# def compute_predictability(df, summary_df):
+#     """
+#     Compute predictability by regressing ref_ivt on mean_score only,
+#     using rank-transformed regression. 
+#     Individual predictability scores max out at the system-level
+#     Spearman correlation.
+#     """
+#     # Predictor (mean_score only)
+#     x_score = summary_df[['mean_score']].values
+#     y = summary_df['ref_ivt'].values
+
+#     # --- Rank-transform data ---
+#     X_ranked = rankdata(x_score.flatten()).reshape(-1, 1)
+#     y_ranked = rankdata(y)
+
+#     # --- Fit rank regression ---
+#     model = LinearRegression().fit(X_ranked, y_ranked)
+#     y_pred_rank = model.predict(X_ranked)
+
+#     # --- Residuals in rank space ---
+#     res = np.abs(y_ranked - y_pred_rank)
+
+#     # --- System-level predictability = Spearman correlation ---
+#     rho, _ = spearmanr(x_score.flatten(), y)
+#     rho = max(rho, 0)  # clip at 0 so it doesn’t go negative
+
+#     # Robust system scale
+#     R_system = np.median(res) + 1e-12  
+
+#     # --- Per-observation predictability ---
+#     predictability = rho / (res / R_system + 1)
+
+#     # --- Collect landfalls (first only) ---
+#     landfalls = []
+#     for tid, group in tqdm(df.groupby('trackid')):
+#         lf_row = group.dropna(subset=['lf_lon']).head(1)
+#         if not lf_row.empty and tid in summary_df['trackid'].values:
+#             lon = lf_row['lf_lon'].iloc[0]
+#             lat = lf_row['lf_lat'].iloc[0]
+#             ivt = summary_df.loc[summary_df['trackid'] == tid, 'ref_ivt'].values[0]
+#             pred = predictability[np.where(summary_df['trackid'] == tid)][0]
+#             landfalls.append((lon, lat, ivt, pred))
+
+#     return pd.DataFrame(landfalls, columns=['lon', 'lat', 'ivt', 'pred'])
+
+
+from sklearn.linear_model import HuberRegressor
+
+def compute_predictability(df, summary_df, epsilon=1.35):
+    """
+    Compute predictability by regressing ref_ivt on mean_score only,
+    using Huber regression (robust linear regression).
+    Individual predictability scores max out at the system-level
+    Pearson R^2.
+    """
+    # Predictor (mean_score only)
+    x_score = summary_df[['mean_score']].values
+    y = summary_df['ref_ivt'].values
+
+    # --- Fit Huber regression ---
+    model = HuberRegressor(epsilon=epsilon).fit(x_score, y)
+    y_pred = model.predict(x_score)
+
+    # --- Residuals in value space ---
+    res = np.abs(y - y_pred)
+
+    # --- System-level predictability = Pearson R^2 ---
+    r, _ = pearsonr(x_score.flatten(), y)
+    R2 = max(r, 0)  # enforce non-negativity
+
+    # Robust system scale
+    R_system = np.median(res) + 1e-12
+
+    # --- Per-observation predictability ---
+    predictability = R2 / (res / R_system + 1)
+
+    # --- Collect landfalls (first only) ---
+    landfalls = []
+    for tid, group in tqdm(df.groupby('trackid')):
+        lf_row = group.dropna(subset=['lf_lon']).head(1)
+        if not lf_row.empty and tid in summary_df['trackid'].values:
+            lon = lf_row['lf_lon'].iloc[0]
+            lat = lf_row['lf_lat'].iloc[0]
+            ivt = summary_df.loc[summary_df['trackid'] == tid, 'ref_ivt'].values[0]
+            pred = predictability[np.where(summary_df['trackid'] == tid)][0]
+            landfalls.append((lon, lat, ivt, pred))
+
+    return pd.DataFrame(landfalls, columns=['lon', 'lat', 'ivt', 'pred'])
+
+
+
+def plot_and_correlate(summary_df, color):
+    x = summary_df['mean_score']
+    y = summary_df['ref_ivt']
+
+    mask = (~pd.isna(x)) & (~pd.isna(y))
+    x = x[mask]
+    y = y[mask]
+
+    if len(x) == 0:
+        print(f"No valid data for {score_col}")
+        return
+
+    r, p = pearsonr(x, y)
+
+    plt.figure(figsize=(2,2))
+    plt.scatter(x, y, alpha=0.05, color=color)
+    plt.xlabel('mean trajectory score')
+    plt.ylabel('IVT at landfall (kg m$^{-1}$ s$^{-1}$)')
+    plt.title(f'Pearson R={r:.2f}')
+    plt.xticks([-3,-2,-1,0,1,2,3])
+    plt.show()
+
+    return r, p
+
+
+
+
+def regrid_coords(df, lon_col='lon', lat_col='lat', res=3.0):
+    """Snap lon/lat coordinates to a regular grid of given resolution (degrees)."""
+    df = df.copy()
+    df['lon_bin'] = (df[lon_col] / res).round() * res
+    df['lat_bin'] = (df[lat_col] / res).round() * res
+    df['lonlat'] = df['lon_bin'].astype(str) + "_" + df['lat_bin'].astype(str)
+    return df
+
+
+%matplotlib 
+MODE = 'node'
+
+
+# PIKART
+summary_pikart = compute_track_scores(d_ars_pikart, Gsigned_pikart,
+                                           min_length=4, use_landfall=True,
+                                           mode=MODE)
+plot_and_correlate(summary_pikart, color='darkcyan')
+plt.savefig("/Users/tbraun/Desktop/scatter_nodeIVT_pikart.png", dpi=500, bbox_inches='tight')
+
+# tARget
+summary_target = compute_track_scores(d_ars_target, Gsigned_target,
+                                           min_length=4, use_landfall=True,
+                                           mode=MODE)
+plot_and_correlate(summary_target, color='mediumpurple')
+plt.savefig("/Users/tbraun/Desktop/scatter_nodeIVT_target.png", dpi=500, bbox_inches='tight')
+
+
+
+# --- Compute predictabilities for both catalogs ---
+lf_pikart = compute_predictability(d_ars_pikart, summary_pikart, epsilon=1)#, method='ols')
+lf_target = compute_predictability(d_ars_target, summary_target, epsilon=1)#, method='ols')
+# Convert it to [-180,180] for target
+lf_target.lon = ((lf_target['lon'] + 180) % 360) - 180
+
+
+# Compute average from all AR tracks that make landfall at the same grid cell (lonlat)
+lf_pikart_agg = lf_pikart.groupby(["lon", "lat"], as_index=False).agg({
+    "ivt": "mean",         # average IVT across tracks
+    "pred": "mean"         # average predictability across tracks
+})
+lf_target_agg = lf_target.groupby(["lon", "lat"], as_index=False).agg({
+    "ivt": "mean",         # average IVT across tracks
+    "pred": "mean"         # average predictability across tracks
+})
+
+
+# --- Prepare for merging ---
+# Regrid landfall locations in both catalogs
+lf_pikart_coarse = regrid_coords(lf_pikart_agg, res=5.0)
+lf_target_coarse = regrid_coords(lf_target_agg, res=5.0)
+
+
+# Merge keeping info about source
+merged = pd.merge(lf_pikart_coarse, lf_target_coarse, on='lonlat', suffixes=('_pikart', '_target'), how='outer')
+# Grid cell centers for plotting
+merged['lon'] = merged[['lon_bin_pikart', 'lon_bin_target']].mean(axis=1, skipna=True)
+merged['lat'] = merged[['lat_bin_pikart', 'lat_bin_target']].mean(axis=1, skipna=True)
+
+
+# Average IVT + predictability where both exist
+merged['ivt'] = merged[['ivt_pikart', 'ivt_target']].mean(axis=1, skipna=True)
+merged['pred'] = merged[['pred_pikart', 'pred_target']].mean(axis=1, skipna=True)
+
+# Flags
+merged['has_pikart'] = ~merged['ivt_pikart'].isna()
+merged['has_target'] = ~merged['ivt_target'].isna()
+merged['both'] = merged['has_pikart'] & merged['has_target']
+
+# --- Split populations ---
+df_both = merged[merged['both']]
+df_unique = merged[~merged['both']]
+
+
+%matplotlib 
+# --- Plot ---
+fig, ax = plt.subplots(figsize=(12.6,12.6), subplot_kw={'projection': ccrs.EqualEarth()})
+ax.set_global()
+ax.add_feature(cfeature.COASTLINE, color='black', zorder=2)
+
+# Population B: unique (only one catalog) – no outline
+sc2 = ax.scatter(
+    df_unique['lon'], df_unique['lat'],
+    c=df_unique['pred'],
+    s=df_unique['ivt'] / 9,
+    cmap=cm.batlow_r,      # same colormap
+    transform=ccrs.PlateCarree(),
+    alpha=0.6, #vmin=0, vmax=1,
+    edgecolors="none",     # no outline
+    label="Only one catalog"
+)
+
+# Population A: overlap (both catalogs) – thin black outline
+sc1 = ax.scatter(
+    df_both['lon'], df_both['lat'],
+    c=df_both['pred'],
+    s=df_both['ivt'] / 9,
+    cmap=cm.batlow_r,      # same colormap
+    transform=ccrs.PlateCarree(),
+    alpha=0.9, #vmin=0, vmax=1,
+    edgecolors="black",    # thin black circle
+    linewidths=.8,
+    label="Both catalogs"
+)
+
+# Shared colorbar
+cb = plt.colorbar(sc1, ax=ax, shrink=0.5, orientation='vertical', pad=0.05)
+cb.ax.tick_params(labelsize=16)
+cb.set_label('Predictability of IVT at landfall', fontsize=16)
+
+plt.savefig("/Users/tbraun/Desktop/Fig2b_predict.png", dpi=500, bbox_inches='tight')
+
+
+
+# Choose some representative IVT values for the legend (adjust as needed)
+ivt_vals = [200, 400, 600, 800, 1000]  # kg m^-1 s^-1
+marker_sizes = [v / 9 for v in ivt_vals]  # must match your scaling
+
+# Create legend handles
+handles = [
+    plt.scatter([], [], s=ms, color="gray", alpha=0.6, edgecolors="none")
+    for ms in marker_sizes
+]
+
+# Add size legend
+size_legend = ax.legend(
+    handles,
+    [f"{v}" for v in ivt_vals],
+    title="IVT at landfall (kg m$^{-1}$ s$^{-1}$)",
+    loc="lower left",
+    fontsize=14,
+    title_fontsize=14,
+    frameon=True
+)
+
+# Add population legend (both vs only one catalog)
+ax.legend(loc="upper left", fontsize=14, frameon=True)
+ax.add_artist(size_legend)  # keep both legends
+
+#ax.legend(loc="lower left")
+plt.show()
+plt.savefig("/Users/tbraun/Desktop/Fig2b_predict.pdf", dpi=500, bbox_inches='tight')
 
 
 
