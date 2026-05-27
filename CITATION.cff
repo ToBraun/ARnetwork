@@ -1,29 +1,27 @@
-cff-version: 1.2.0
-message: "If you use this software, please cite both the software itself and the companion paper (see preferred-citation)."
-title: "ARnetwork: Atmospheric River Transport Networks"
+cff-version: 1.0.0
+message: "If you use this software, please cite the companion paper."
+title: "ARnetwork.py"
 abstract: >-
   Codebase for constructing, analyzing, and visualizing Atmospheric River
-  Transport Networks (ARTNs) as directed, weighted graphs derived from the
-  PIKART catalog and ERA5 reanalysis. Includes pipelines for network
-  construction on an H3 hexagonal grid, topological and dynamical analysis,
+  Transport Networks (ARTNs) as directed, weighted graphs derived from atmospheric river catalogs.
+  Includes pipelines for transport network construction on a hexagonal grid, topological and dynamical analysis,
   and visualization of global AR transport patterns.
 type: software
 authors:
   - family-names: Braun
     given-names: Tobias
     affiliation: "Leipzig University; Potsdam Institute for Climate Impact Research (PIK)"
-    # orcid: "https://orcid.org/XXXX-XXXX-XXXX-XXXX"  # add your ORCID
+    orcid: "https://orcid.org/0000-0002-3095-8960"  
 repository-code: "https://github.com/ToBraun/ARnetwork"
 url: "https://github.com/ToBraun/ARnetwork"
-license: Apache-2.0
-version: "0.1.0"           # bump on each tagged release
-date-released: "2026-05-27" # update to the actual release date
+license: MIT
+version: "0.1.0"           
+date-released: "2026-05-27" 
 keywords:
   - atmospheric rivers
   - complex networks
   - climate dynamics
   - extreme precipitation
-  - ERA5
   - PIKART
   - directed weighted graphs
   - H3 hexagonal grid
@@ -41,8 +39,15 @@ preferred-citation:
       given-names: Norbert
     - family-names: Kurths
       given-names: "J\u00FCrgen"
-    # add remaining four co-authors here
+    - family-names: Quaas
+      given-names: Johannes
+    - family-names: Diaz-Guilera
+      given-names: Albert
+    - family-names: Gimeno
+      given-names: Luis
+    - family-names: Mahecha
+      given-names: Miguel D.
   year: 2026
   doi: "10.21203/rs.3.rs-7482510/v2"
   url: "https://doi.org/10.21203/rs.3.rs-7482510/v2"
-  notes: "Research Square preprint (v2). Replace with journal reference upon publication."
+  notes: "Research Square preprint (v2)."
