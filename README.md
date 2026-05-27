@@ -154,4 +154,4 @@ Released under the [MIT License](LICENSE).
 ## Contact
 
 Dr. Tobias Braun &mdash; Postdoctoral researcher, University of Leipzig &middot; Potsdam Institute for Climate Impact Research.
-For questions, issues, and suggestions, please open an [issue](https://github.com/ToBraun/ARnetwork/issues) and feel free to [reach out](tobias.braun@uni-leipzig.de)!
+For questions, issues, and suggestions, please open an [issue](https://github.com/ToBraun/ARnetwork/issues) and feel free to [reach out](mailto:tobias.braun@uni-leipzig.de)!
