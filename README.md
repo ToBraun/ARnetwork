@@ -113,18 +113,17 @@ import pandas as pd
 import ARnet_sub as artn
 
 ARcat = pd.read_pickle("data/PIKART_hex.pkl")
-
+# Pre-process: set AR locator, grid type, spatial resolution (and possibly clip spatiotemporally & apply conditions)
 l_arcats, d_coord_dict = artn.preprocess_catalog(
     ARcat, T=None, loc="centroid", grid_type="hexagonal",
-    X="global", res=2, cond=None, LC_cond=None,
-)
+    X="global", res=2, cond=None, LC_cond=None)
+# Compute transport matrix
 A, t_idx, t_hexidx, t_ivt, t_grid = artn.generate_transport_matrix(
-    l_arcats, "hexagonal", d_coord_dict, LC_cond=None,
-)
+    l_arcats, "hexagonal", d_coord_dict, LC_cond=None)
+# Generate networkx graph representation of the ARTN with a certain threshold
 G = artn.generate_network(
     A, t_grid, weighted=True, directed=True,
-    eps=16, self_links=False, weighing="absolute",
-)
+    eps=16, self_links=False, weighing="absolute")
 ```
 
 The full set of analyses reproducing the paper figures lives under `analysis/`.
