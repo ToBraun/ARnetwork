@@ -7,7 +7,7 @@ Codebase for constructing, analysing, and visualising **Atmospheric River Transp
 
 ## About
 
-Atmospheric rivers (ARs) transport vast amounts of water vapour and are responsible for a substantial share of global precipitation and wind extremes. The global AR network ingests individual AR trajectories and creates edges based on their recurrent transport patterns. ARs are localized by a suitable 2D locator, e.g., the AR centroid. The resulting Atmospheric River Transport Network (ARTN) is a directed, weighted graph. This enables us study the planetary-scale pattern of AR transport with the tools of complex network science: centralities, shortest paths, communities, random walks and secondary node/edge attributes that carry additional information on AR transport (e.g., integrated water vapour transport). 
+Atmospheric rivers (ARs) transport vast amounts of water vapour and are responsible for a substantial share of global precipitation and wind extremes. The global ARTN emerges from individual AR trajectories with edges defined by recurrent AR transport patterns. ARs are localized by a suitable 2D locator, e.g., the AR centroid. The ARTN is a directed, weighted graph. This enables us to study the planetary-scale pattern of AR transport with the tools of complex network science: centralities, shortest paths, communities, random walks and secondary node/edge attributes that carry additional information on AR transport (e.g., integrated water vapour transport). 
 
 This repository contains the analysis code accompanying the paper:
 
@@ -15,7 +15,7 @@ This repository contains the analysis code accompanying the paper:
 > *Atmospheric river trajectories organise along a global transport network.*
 > Preprint (2026). https://doi.org/10.21203/rs.3.rs-7482510/v2
 
-The networks are built from two independent global AR catalogues &mdash; [**PIKART**](https://ar.pik-potsdam.de)  and **tARget-4** &mdash; both derived from ERA5 reanalysis. Most results in the paper are reported as the consensus of the two catalogues.
+The networks are built from two independent global AR catalogues &mdash; [**PIKART**](https://ar.pik-potsdam.de)-1.0  and **tARget-4** &mdash; both derived from ERA5 reanalysis. Most results in the paper are reported as the consensus of the two catalogues.
 
 ## Repository structure
 
@@ -23,8 +23,8 @@ The networks are built from two independent global AR catalogues &mdash; [**PIKA
 ARnetwork/
 ├── analysis/      # core Python modules and analysis scripts (figures of the paper)
 ├── ARnetlab/      # Jupyter notebooks: exploratory analyses and extensions
-├── ARTN.png       # repository header image
-├── LICENSE        # Apache-2.0
+├── ARTN.png       # repo header image
+├── LICENSE        # MIT
 └── README.md
 ```
 
@@ -112,14 +112,18 @@ A minimal example:
 import pandas as pd
 import ARnet_sub as artn
 
+# Load catalog (already gridded on hexagonal grid)
 ARcat = pd.read_pickle("data/PIKART_hex.pkl")
+
 # Pre-process: set AR locator, grid type, spatial resolution (and possibly clip spatiotemporally & apply conditions)
 l_arcats, d_coord_dict = artn.preprocess_catalog(
     ARcat, T=None, loc="centroid", grid_type="hexagonal",
     X="global", res=2, cond=None, LC_cond=None)
+
 # Compute transport matrix
 A, t_idx, t_hexidx, t_ivt, t_grid = artn.generate_transport_matrix(
     l_arcats, "hexagonal", d_coord_dict, LC_cond=None)
+
 # Generate networkx graph representation of the ARTN with a certain threshold
 G = artn.generate_network(
     A, t_grid, weighted=True, directed=True,
@@ -149,5 +153,5 @@ Released under the [MIT License](LICENSE).
 
 ## Contact
 
-Tobias Braun &mdash; Postdoctoral researcher, University of Leipzig &middot; Potsdam Institute for Climate Impact Research
-For questions, issues, and suggestions, please open an [issue](https://github.com/ToBraun/ARnetwork/issues).
+Dr. Tobias Braun &mdash; Postdoctoral researcher, University of Leipzig &middot; Potsdam Institute for Climate Impact Research.
+For questions, issues, and suggestions, please open an [issue](https://github.com/ToBraun/ARnetwork/issues) and feel free to [reach out](tobias.braun@uni-leipzig.de)!
