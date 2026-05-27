@@ -53,8 +53,8 @@ These are derived from the following source data:
   [disc.gsfc.nasa.gov](https://disc.gsfc.nasa.gov/)
 
 Additionally, the following data has been used in the manuscript:
-- The **AR-CONNECT** dataset is available at the UC San Diego Library's Research Data Curation Program at \url{https://doi.org/10.6075/J0D21W00}.
-- The catalog derived from the **IPART algorithm** can be generated from the code stored in the Zenodo repository at \url{https://doi.org/10.5281/zenodo.3864592}. 
+- The **AR-CONNECT** dataset is available at the [UC San Diego Library's Research Data Curation Program](https://doi.org/10.6075/J0D21W00).
+- The catalog derived from the **IPART algorithm** can be generated from the code stored in the [Zenodo repository](https://doi.org/10.5281/zenodo.3864592).
 - **HydroSHEDS** digital elevation model (only used for plotting topography):
   [hydrosheds.org](https://www.hydrosheds.org)
 - **Oceanic Niño Index (ONI) V2**, provided by NOAA:
