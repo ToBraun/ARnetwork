@@ -1,0 +1,48 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software itself and the companion paper (see preferred-citation)."
+title: "ARnetwork: Atmospheric River Transport Networks"
+abstract: >-
+  Codebase for constructing, analyzing, and visualizing Atmospheric River
+  Transport Networks (ARTNs) as directed, weighted graphs derived from the
+  PIKART catalog and ERA5 reanalysis. Includes pipelines for network
+  construction on an H3 hexagonal grid, topological and dynamical analysis,
+  and visualization of global AR transport patterns.
+type: software
+authors:
+  - family-names: Braun
+    given-names: Tobias
+    affiliation: "Leipzig University; Potsdam Institute for Climate Impact Research (PIK)"
+    # orcid: "https://orcid.org/XXXX-XXXX-XXXX-XXXX"  # add your ORCID
+repository-code: "https://github.com/ToBraun/ARnetwork"
+url: "https://github.com/ToBraun/ARnetwork"
+license: Apache-2.0
+version: "0.1.0"           # bump on each tagged release
+date-released: "2026-05-27" # update to the actual release date
+keywords:
+  - atmospheric rivers
+  - complex networks
+  - climate dynamics
+  - extreme precipitation
+  - ERA5
+  - PIKART
+  - directed weighted graphs
+  - H3 hexagonal grid
+  - transport networks
+  - atmospheric science
+preferred-citation:
+  type: article
+  title: "Atmospheric river trajectories organise along a global transport network"
+  authors:
+    - family-names: Braun
+      given-names: Tobias
+    - family-names: Vallejo-Bernal
+      given-names: Sara M.
+    - family-names: Marwan
+      given-names: Norbert
+    - family-names: Kurths
+      given-names: "J\u00FCrgen"
+    # add remaining four co-authors here
+  year: 2026
+  doi: "10.21203/rs.3.rs-7482510/v2"
+  url: "https://doi.org/10.21203/rs.3.rs-7482510/v2"
+  notes: "Research Square preprint (v2). Replace with journal reference upon publication."
